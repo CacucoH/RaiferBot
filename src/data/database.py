@@ -3,6 +3,7 @@
     All calls made to database are handled here
 """
 import sqlite3
+import logging
 
 
 # Connect to db
@@ -25,6 +26,7 @@ def create_database() -> None:
         """CREATE TABLE IF NOT EXISTS user_data(
             user_id INTEGER PRIMARY KEY,
             raifa_size INTEGER,
+            chat_id INTEGER,
             last_grown STRING
         )"""
     ]
@@ -59,37 +61,74 @@ def check_user_exist(id: int) -> bool:
 
 
 def get_admin_status(id: int, chat_id: int) -> bool:
+    if not check_user_exist(id):
+        return False
+    
     user_is_admin = c.execute("SELECT admin FROM usr_chan_connection WHERE user_id=? AND chat_id=?",
                      (id, chat_id)).fetchall()
-    
     return user_is_admin[0][0] == 1
 
 
-def set_group_admin(id: int, chat_id: int):
+def get_chat_admins(chat_id: int) -> list[tuple[int]] | None:
+    admins_list = c.execute("SELECT user_id FROM usr_chan_connection WHERE chat_id=?",
+                            (chat_id,)).fetchall()
+    
+    return admins_list
+
+
+def set_group_admin(id: int, chat_id: int) -> bool:
     if not check_user_exist(id=id):
         add_new_user(user_id=id, chat_id=chat_id, admin=1)
-        return
+        return True
+    
+    if not get_admin_status(id=id, chat_id=chat_id):
+        c.execute("UPDATE usr_chan_connection SET admin=1")
+        connection.commit()
+        return True
+    
+    return False
 
-    c.execute("UPDATE usr_chan_connection SET admin=1")
+
+def revoke_admin(user_id: int, chat_id: int):
+    c.execute("UPDATE usr_chan_connection SET admin=0 WHERE user_id=? AND chat_id=?",
+              (user_id, chat_id,))
+    
     connection.commit()
-
-
-def revoke_admin(): #TODO
-    pass
+    logging.info(f"Admin priv. was removed from {user_id} in {chat_id}")
 
 
 def add_new_user(user_id: int, chat_id: int, admin: int):
+    if check_user_exist(id=user_id):
+        return
+
     c.execute("INSERT INTO usr_chan_connection (user_id, chat_id, admin) VALUES (?, ?, ?)",
               (user_id, chat_id, admin))
-    c.execute("INSERT INTO user_data (user_id, raifa_size, last_grown) VALUES (?, ?, ?)",
-              (user_id, 0, "newbie"))
-    
+    c.execute("INSERT INTO user_data (user_id, chat_id, raifa_size, last_grown) VALUES (?, ?, ?, ?)",
+              (user_id, chat_id ,0, "newbie"))
+
     connection.commit()
+    
+    if admin == 0:
+        logging.info(f"User {user_id} wants to play the game and was aded!")
+        return
+    logging.info(f"Admin {user_id} of chat {chat_id} was added successfully")
 
 
-def remove_user(user_id: int):
-    c.execute("DELETE FROM usr_chan_connection WHERE user_id=?")
-    c.execute("DELETE FROM user_data WHERE user_id=?")
+def remove_user(user_id: int, chat_id: int):
+    c.execute("DELETE FROM usr_chan_connection WHERE user_id=? AND chat_id=?",
+              (user_id, chat_id,))
+    c.execute("DELETE FROM user_data WHERE user_id=? AND chat_id=?",
+              (user_id, chat_id,))
+
+    connection.commit()
+    logging.warning(f"User {user_id} was removed from the {chat_id}!")
+
+
+def remove_chat(chat_id: int):
+    c.execute("DELETE FROM usr_chan_connection WHERE chat_id=?",
+              (chat_id,))
+    c.execute("DELETE FROM user_data WHERE chat_id=?",
+              (chat_id,))
 
     connection.commit()
 
@@ -121,3 +160,12 @@ def set_raifa_size(id: int, new_size: int, date: str) -> None:
               (new_size, date, id))
     
     connection.commit()
+
+
+def get_raifa_statistics(chat_id: int) -> list[dict[str, int]] | None:
+    players = c.execute("SELECT user_id, raifa_size FROM user_data WHERE chat_id = ?",
+                        (chat_id,)).fetchall()
+
+    if players:
+        return players
+    return

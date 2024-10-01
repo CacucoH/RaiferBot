@@ -30,9 +30,16 @@ async def main():
 
     dp.include_router(router=router)
     await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
-
+    updates = dp.resolve_used_update_types()
+    updates.append("chat_member")
+    await dp.start_polling(bot, allowed_updates=updates)
+                           
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    # TODO: add filehandler instead of streamhandler
+    logging.basicConfig(
+        level=logging.INFO, 
+        format="[%(levelname)s] - %(asctime)s - %(message)s",
+        datefmt="%Y/%m/%d %H:%M:%S"
+    )
     asyncio.run(main())

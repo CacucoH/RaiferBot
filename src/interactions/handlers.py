@@ -8,91 +8,106 @@ from aiogram.types import (InlineKeyboardMarkup, InlineKeyboardButton, \
     ReplyKeyboardMarkup, KeyboardButton, Message)
 from aiogram import types, F, Router
 from aiogram.enums import ChatType
-from aiogram.filters import (Command, IS_ADMIN, \
-                             IS_MEMBER, IS_NOT_MEMBER, chat_member_updated)
-import json, random
+from aiogram.filters import (Command, PROMOTED_TRANSITION, JOIN_TRANSITION, \
+                             IS_MEMBER, LEAVE_TRANSITION, chat_member_updated)
 
-import src.data.database as db
 from src.interactions import logic
 from main import bot
 
 
 router = Router()
 
-
-# Obtain all neccessary json data
-with open("./src/data/text_data.json", "r") as f:
-    json_data = json.load(f)
-
+#    _____            __                    __                    ____              
+#   / ___/__  _______/ /____  ____ ___     / /_  ____ _____  ____/ / /__  __________
+#   \__ \/ / / / ___/ __/ _ \/ __ `__ \   / __ \/ __ `/ __ \/ __  / / _ \/ ___/ ___/
+#  ___/ / /_/ (__  ) /_/  __/ / / / / /  / / / / /_/ / / / / /_/ / /  __/ /  (__  ) 
+# /____/\__, /____/\__/\___/_/ /_/ /_/  /_/ /_/\__,_/_/ /_/\__,_/_/\___/_/  /____/  
+#      /____/                                                                       
 
 @router.message(Command("start"))
 async def start_handler(msg: Message) -> None:
     """
         Basically handles a `/start` and `/setup` message 
         and returns an inline keyboard.
-
+        
         Content of keyboard depends on user presence in database.
         This option available only from **private** chat.
     """
-    if msg.chat.type != ChatType.PRIVATE:
-        await msg.answer("Ноу ноу ноу мистер фиш, меня можно натсроить только через личку")
-        return
-    
-    user_in_db = db.check_user_exist(msg.from_user.id)
+    await logic.start_handler_logic(msg=msg)
 
-    keyboard = (
-        [
-            [
-                InlineKeyboardButton(text="Погнали!", callback_data="1")
-            ],
-            [
-                InlineKeyboardButton(text="Испытать удачу", url="https://vk.cc/3uBrgx") # Come and see; useful stuff here!
-            ]
-        ]
-    )
 
-    reply_markup: InlineKeyboardMarkup = InlineKeyboardMarkup(inline_keyboard=keyboard)
+@router.my_chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
+async def bot_added_to_chat(event: chat_member_updated.ChatMemberUpdated):
+    """
+        Handles if **this** bot joined the channel
+    """
+    if (event.new_chat_member.user.id == bot.id and event.new_chat_member.user.is_bot):
+        await logic.bot_added_to_chat_logic(event)
 
-    if not user_in_db:
-        await msg.answer(text=json_data["RU"]["TEXT_MENU"]["GREETS"]["user_not_in_db"],
-                reply_markup=reply_markup)
-        return
-    
-    await msg.answer(text=json_data["RU"]["TEXT_MENU"]["GREETS"][f"greet_{random.randint(1,3)}"],
-                reply_markup=reply_markup)
 
+@router.my_chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=LEAVE_TRANSITION))
+async def bot_kicked_from_chat(event: chat_member_updated.ChatMemberUpdated):
+    """
+        Deletes chat from db if **this** bot was kicked and notifies all admins
+    """
+    if (event.new_chat_member.user.id == bot.id and event.new_chat_member.user.is_bot):
+        await logic.bot_kicked_from_chat_logic(event)
+
+
+@router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
+async def someone_added_to_chat(event: chat_member_updated.ChatMemberUpdated):
+    """
+        Handles if new member joined the channel
+    """
+    await logic.someone_added_to_chat_logic(event)
+
+
+@router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=LEAVE_TRANSITION))
+async def someone_kicked_from_chat(event: chat_member_updated.ChatMemberUpdated):
+    """
+        Handles if new member left the channel
+    """
+    await logic.someone_kicked_from_chat_logic(event)
+
+
+@router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=PROMOTED_TRANSITION))
+async def user_privelege_escalated(event: chat_member_updated.ChatMemberUpdated):
+    """
+        Handles if memner became admin
+    """
+    await logic.user_privelege_escalated_logic(event)
+
+
+@router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=~PROMOTED_TRANSITION))
+async def user_privelege_downgrade(event: chat_member_updated.ChatMemberUpdated):
+    """
+        Handles if memner became admin
+    """
+    await logic.user_privelege_downgrade_logic(event)
+
+
+#    ______                        __                    ____              
+#   / ____/___ _____ ___  ___     / /_  ____ _____  ____/ / /__  __________
+#  / / __/ __ `/ __ `__ \/ _ \   / __ \/ __ `/ __ \/ __  / / _ \/ ___/ ___/
+# / /_/ / /_/ / / / / / /  __/  / / / / /_/ / / / / /_/ / /  __/ /  (__  ) 
+# \____/\__,_/_/ /_/ /_/\___/  /_/ /_/\__,_/_/ /_/\__,_/_/\___/_/  /____/  
+                                                                         
 
 @router.message(Command("raifa"))
 async def grow_raifa(msg: Message):
     await logic.grow_raifa_logic(msg)
 
 
-# @router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(IS_NOT_MEMBER >> IS_MEMBER))
-# async def new_member_added(event: chat_member_updated.ChatMemberUpdated):
-#     """
-#         Handles if someone joined
-#     """
-#     # Check if bot itself was added
-#     if (event.new_chat_member.user.id == bot.id and event.new_chat_member.user.is_bot):
-#         print("я чурка")
+@router.message(Command("stat"))
+async def show_statistics(msg: Message):
+    await logic.show_statistics_logic(chat_id=msg.chat.id)
 
 
-@router.my_chat_member(chat_member_updated.ChatMemberUpdatedFilter(IS_NOT_MEMBER >> IS_MEMBER))
-async def bot_added_to_chat(event: chat_member_updated.ChatMemberUpdated):
-    """
-        Handles if this bot joined the channel
-    """
-    # Check if bot itself was added
-    if (event.new_chat_member.user.id == bot.id and event.new_chat_member.user.is_bot):
-        admins = await bot.get_chat_administrators(event.chat.id)
-
-        # Add admins to the database
-        for i in admins:
-            if not i.user.is_bot:
-                db.set_group_admin(id=i.user.id, chat_id=event.chat.id)
+# @router.message(Command("rules"))
+# async def show_rules():
 
 
-@router.message()
+@router.message(F.content_type.in_({'text', 'sticker'}))
 async def message_reply(msg: Message) -> None:
     prem = {None:"лох", True:"крутой"}
     await msg.answer(f"Ты знал что ты {msg.from_user.first_name} и еще ты {prem[msg.from_user.is_premium]}")
