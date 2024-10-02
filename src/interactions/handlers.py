@@ -7,15 +7,24 @@
 from aiogram.types import (InlineKeyboardMarkup, InlineKeyboardButton, \
     ReplyKeyboardMarkup, KeyboardButton, Message)
 from aiogram import types, F, Router
+
 from aiogram.enums import ChatType
 from aiogram.filters import (Command, PROMOTED_TRANSITION, JOIN_TRANSITION, \
                              IS_MEMBER, LEAVE_TRANSITION, chat_member_updated)
 
-from src.interactions import logic
+from src.interactions import logic, my_filters
 from main import bot
 
 
-router = Router()
+group_router = Router()
+group_router.message.filter(
+    my_filters.ChatTypeFilter(["group", "supergroup"])
+)
+
+private_router = Router()
+private_router.message.filter(
+    my_filters.ChatTypeFilter("private")
+)
 
 #    _____            __                    __                    ____              
 #   / ___/__  _______/ /____  ____ ___     / /_  ____ _____  ____/ / /__  __________
@@ -24,7 +33,7 @@ router = Router()
 # /____/\__, /____/\__/\___/_/ /_/ /_/  /_/ /_/\__,_/_/ /_/\__,_/_/\___/_/  /____/  
 #      /____/                                                                       
 
-@router.message(Command("start"))
+@private_router.message(Command(commands=["start", "setup"]))
 async def start_handler(msg: Message) -> None:
     """
         Basically handles a `/start` and `/setup` message 
@@ -32,11 +41,13 @@ async def start_handler(msg: Message) -> None:
         
         Content of keyboard depends on user presence in database.
         This option available only from **private** chat.
-    """
+    """ 
     await logic.start_handler_logic(msg=msg)
 
 
-@router.my_chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
+
+
+@group_router.my_chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
 async def bot_added_to_chat(event: chat_member_updated.ChatMemberUpdated):
     """
         Handles if **this** bot joined the channel
@@ -45,7 +56,7 @@ async def bot_added_to_chat(event: chat_member_updated.ChatMemberUpdated):
         await logic.bot_added_to_chat_logic(event)
 
 
-@router.my_chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=LEAVE_TRANSITION))
+@group_router.my_chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=LEAVE_TRANSITION))
 async def bot_kicked_from_chat(event: chat_member_updated.ChatMemberUpdated):
     """
         Deletes chat from db if **this** bot was kicked and notifies all admins
@@ -54,7 +65,7 @@ async def bot_kicked_from_chat(event: chat_member_updated.ChatMemberUpdated):
         await logic.bot_kicked_from_chat_logic(event)
 
 
-@router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
+@group_router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
 async def someone_added_to_chat(event: chat_member_updated.ChatMemberUpdated):
     """
         Handles if new member joined the channel
@@ -62,7 +73,7 @@ async def someone_added_to_chat(event: chat_member_updated.ChatMemberUpdated):
     await logic.someone_added_to_chat_logic(event)
 
 
-@router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=LEAVE_TRANSITION))
+@group_router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=LEAVE_TRANSITION))
 async def someone_kicked_from_chat(event: chat_member_updated.ChatMemberUpdated):
     """
         Handles if new member left the channel
@@ -70,7 +81,7 @@ async def someone_kicked_from_chat(event: chat_member_updated.ChatMemberUpdated)
     await logic.someone_kicked_from_chat_logic(event)
 
 
-@router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=PROMOTED_TRANSITION))
+@group_router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=PROMOTED_TRANSITION))
 async def user_privelege_escalated(event: chat_member_updated.ChatMemberUpdated):
     """
         Handles if memner became admin
@@ -78,7 +89,7 @@ async def user_privelege_escalated(event: chat_member_updated.ChatMemberUpdated)
     await logic.user_privelege_escalated_logic(event)
 
 
-@router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=~PROMOTED_TRANSITION))
+@group_router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=~PROMOTED_TRANSITION))
 async def user_privelege_downgrade(event: chat_member_updated.ChatMemberUpdated):
     """
         Handles if memner became admin
@@ -93,21 +104,21 @@ async def user_privelege_downgrade(event: chat_member_updated.ChatMemberUpdated)
 # \____/\__,_/_/ /_/ /_/\___/  /_/ /_/\__,_/_/ /_/\__,_/_/\___/_/  /____/  
                                                                          
 
-@router.message(Command("raifa"))
+@group_router.message(Command("raifa"))
 async def grow_raifa(msg: Message):
     await logic.grow_raifa_logic(msg)
 
 
-@router.message(Command("stat"))
+@group_router.message(Command("stat"))
 async def show_statistics(msg: Message):
     await logic.show_statistics_logic(chat_id=msg.chat.id)
 
 
-# @router.message(Command("rules"))
+# @group_router.message(Command("rules"))
 # async def show_rules():
 
 
-@router.message(F.content_type.in_({'text', 'sticker'}))
+@group_router.message(F.content_type.in_({'text', 'sticker'}))
 async def message_reply(msg: Message) -> None:
     prem = {None:"лох", True:"крутой"}
     await msg.answer(f"Ты знал что ты {msg.from_user.first_name} и еще ты {prem[msg.from_user.is_premium]}")

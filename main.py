@@ -26,9 +26,12 @@ async def main():
         Lorem ipsum
     """
     # Avoid circular import
-    from src.interactions.handlers import router
+    from src.interactions.handlers import group_router, private_router
 
-    dp.include_router(router=router)
+    # Use 2 routers: one for DM and one for groups
+    dp.include_router(router=group_router)
+    dp.include_router(router=private_router)
+
     await bot.delete_webhook(drop_pending_updates=True)
     updates = dp.resolve_used_update_types()
     updates.append("chat_member")

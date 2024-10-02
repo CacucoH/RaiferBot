@@ -1,18 +1,13 @@
-from typing import List
-
 from aiogram.filters import BaseFilter
 from aiogram.types import Message
 
 
-class IsAdmin(BaseFilter):
-    """
-        Go through user list
-        and find admins
-    """
-    def __init__(self, user_ids: int | List[int]) -> None:
-        self.user_ids = user_ids
+class ChatTypeFilter(BaseFilter):
+    def __init__(self, allowed_types: list[str] | str):
+        self.allowed_types = allowed_types
 
     async def __call__(self, message: Message) -> bool:
-        if isinstance(self.user_ids, int):
-            return message.from_user.id == self.user_ids
-        return message.from_user.id in self.user_ids
+        if not isinstance(self.allowed_types, str):
+            return message.chat.type in self.allowed_types
+        else:
+            return message.chat.type == self.allowed_types

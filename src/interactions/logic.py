@@ -35,7 +35,7 @@ async def start_handler_logic(msg: Message):
     keyboard = (
         [
             [
-                InlineKeyboardButton(text="Погнали!", callback_data="1")
+                InlineKeyboardButton(text="Погнали!", callback_data="lesgo")
             ],
             [
                 InlineKeyboardButton(text="Испытать удачу", url="https://vk.cc/3uBrgx") # Come and see; useful stuff here!
@@ -115,12 +115,14 @@ async def someone_kicked_from_chat_logic(event: chat_member_updated.ChatMemberUp
 
 async def user_privelege_escalated_logic(event: chat_member_updated.ChatMemberUpdated):
     database.set_group_admin(id=event.new_chat_member.user.id, chat_id=event.chat.id)
-    logging.info("хуй")
+    logging.info(f"{event.new_chat_member.user.full_name} ({event.new_chat_member.user.id}) \
+is now admin in {event.chat.full_name} {event.chat.id}")
 
 
 async def user_privelege_downgrade_logic(event: chat_member_updated.ChatMemberUpdated):
     database.revoke_admin(user_id=event.new_chat_member.user.id, chat_id=event.chat.id)
-    logging.info("хуй")
+    logging.info(f"{event.new_chat_member.user.full_name} ({event.new_chat_member.user.id}) \
+is no longer admin in {event.chat.full_name} {event.chat.id}")
 
 
 #  ██████╗  █████╗ ███╗   ███╗███████╗    ██╗  ██╗ █████╗ ███╗   ██╗██████╗ ██╗     ███████╗██████╗ ███████╗
