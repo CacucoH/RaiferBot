@@ -5,7 +5,7 @@
     
 """
 from aiogram.types import (InlineKeyboardMarkup, InlineKeyboardButton, \
-    ReplyKeyboardMarkup, KeyboardButton, Message)
+    ReplyKeyboardMarkup, KeyboardButton, Message, CallbackQuery)
 from aiogram import types, F, Router
 
 from aiogram.enums import ChatType
@@ -16,11 +16,13 @@ from src.interactions import logic, my_filters
 from main import bot
 
 
+# Handles only group messages
 group_router = Router()
 group_router.message.filter(
     my_filters.ChatTypeFilter(["group", "supergroup"])
 )
 
+# Handles only DM messages
 private_router = Router()
 private_router.message.filter(
     my_filters.ChatTypeFilter("private")
@@ -32,6 +34,12 @@ private_router.message.filter(
 #  ___/ / /_/ (__  ) /_/  __/ / / / / /  / / / / /_/ / / / / /_/ / /  __/ /  (__  ) 
 # /____/\__, /____/\__/\___/_/ /_/ /_/  /_/ /_/\__,_/_/ /_/\__,_/_/\___/_/  /____/  
 #      /____/                                                                       
+
+
+"""
+    DM HANDLERS
+"""
+
 
 @private_router.message(Command(commands=["start", "setup"]))
 async def start_handler(msg: Message) -> None:
@@ -45,6 +53,45 @@ async def start_handler(msg: Message) -> None:
     await logic.start_handler_logic(msg=msg)
 
 
+@private_router.message(F.content_type.in_({'text', 'sticker'}))
+async def message_reply(msg: Message) -> None:
+    prem = {None:"лох", True:"крутой"}
+    await msg.answer(f"Ты знал что ты {msg.from_user.first_name} и еще ты {prem[msg.from_user.is_premium]}")
+
+
+"""
+    DM BUTTON HANDLERS
+"""
+
+
+@private_router.callback_query(F.data == "rules")
+async def rules(call: CallbackQuery):
+    await logic.show_rules(call)
+
+
+@private_router.callback_query(F.data == "lesgo")
+async def setup_menu(call: CallbackQuery):
+    await logic.setup_menu_logic(call)
+
+
+@private_router.callback_query(F.data == "exit_main_menu")
+async def send_menu(call: CallbackQuery):
+    await logic.start_handler_logic(callback=call)
+
+
+@private_router.callback_query(F.data.regexp(r"setup_channel:-*[0-9]+"))
+async def setup_chat(call: CallbackQuery):
+    await logic.setup_chat_logic(callback=call)
+
+
+@private_router.callback_query(F.data.regexp(r"delete_bot_in:-*[0-9]+"))
+async def remove_bot_from(call: CallbackQuery):
+    await logic.remove_bot_from_logic(callback=call)
+
+
+"""
+    GROUP/SUPERGROUP HANDLERS
+"""
 
 
 @group_router.my_chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
@@ -84,7 +131,7 @@ async def someone_kicked_from_chat(event: chat_member_updated.ChatMemberUpdated)
 @group_router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=PROMOTED_TRANSITION))
 async def user_privelege_escalated(event: chat_member_updated.ChatMemberUpdated):
     """
-        Handles if memner became admin
+        Handles if member became admin
     """
     await logic.user_privelege_escalated_logic(event)
 
@@ -92,7 +139,15 @@ async def user_privelege_escalated(event: chat_member_updated.ChatMemberUpdated)
 @group_router.chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=~PROMOTED_TRANSITION))
 async def user_privelege_downgrade(event: chat_member_updated.ChatMemberUpdated):
     """
-        Handles if memner became admin
+        Handles if member became admin
+    """
+    await logic.user_privelege_downgrade_logic(event)
+
+
+@group_router.my_chat_member(chat_member_updated.ChatMemberUpdatedFilter(member_status_changed=~PROMOTED_TRANSITION))
+async def bot_privelege_downgrade(event: chat_member_updated.ChatMemberUpdated):
+    """
+        Handles if this bot lost their admin priv.
     """
     await logic.user_privelege_downgrade_logic(event)
 
@@ -102,7 +157,7 @@ async def user_privelege_downgrade(event: chat_member_updated.ChatMemberUpdated)
 #  / / __/ __ `/ __ `__ \/ _ \   / __ \/ __ `/ __ \/ __  / / _ \/ ___/ ___/
 # / /_/ / /_/ / / / / / /  __/  / / / / /_/ / / / / /_/ / /  __/ /  (__  ) 
 # \____/\__,_/_/ /_/ /_/\___/  /_/ /_/\__,_/_/ /_/\__,_/_/\___/_/  /____/  
-                                                                         
+                                                        
 
 @group_router.message(Command("raifa"))
 async def grow_raifa(msg: Message):
@@ -116,9 +171,3 @@ async def show_statistics(msg: Message):
 
 # @group_router.message(Command("rules"))
 # async def show_rules():
-
-
-@group_router.message(F.content_type.in_({'text', 'sticker'}))
-async def message_reply(msg: Message) -> None:
-    prem = {None:"лох", True:"крутой"}
-    await msg.answer(f"Ты знал что ты {msg.from_user.first_name} и еще ты {prem[msg.from_user.is_premium]}")

@@ -5,6 +5,7 @@ import os
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.enums.parse_mode import ParseMode
+from aiogram.client.default import DefaultBotProperties
 from aiogram import Dispatcher, Bot
 from dotenv import load_dotenv
 
@@ -14,7 +15,12 @@ dp = Dispatcher(storage=MemoryStorage())
 load_dotenv()
 
 # Create bot instance
-bot = Bot(token=os.getenv('TOKEN'))
+bot = Bot(
+    token=os.getenv('TOKEN'),
+        default=DefaultBotProperties(
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+    )
 
 
 async def main():

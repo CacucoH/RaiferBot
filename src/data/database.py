@@ -76,6 +76,14 @@ def get_chat_admins(chat_id: int) -> list[tuple[int]] | None:
     return admins_list
 
 
+def get_chats_for_user(user_id: int) -> list[tuple[int]] | None:
+    chats_list = c.execute("SELECT chat_id FROM usr_chan_connection WHERE user_id=?",
+                           (user_id,)).fetchall()
+    if not chats_list:
+        return
+    return chats_list
+
+
 def set_group_admin(id: int, chat_id: int) -> bool:
     if not check_user_exist(id=id):
         add_new_user(user_id=id, chat_id=chat_id, admin=1)
@@ -169,3 +177,22 @@ def get_raifa_statistics(chat_id: int) -> list[dict[str, int]] | None:
     if players:
         return players
     return
+
+
+def inspect_raifa_command_execution(chat_id: int) -> bool:
+    """
+        ### Just a very optional and almost useless command
+        I just wanted bot to say `"Никто еще не растил раифу"` iff no one played yet
+        - Returns `false` if command wasn't executed yet
+        - Returns `true` if ~virginity lost~ command executed sometime
+    """
+    all_players = c.execute("SELECT user_id FROM user_data WHERE chat_id = ?",
+                        (chat_id,)).fetchall()
+    
+    newbie_players = c.execute("SELECT user_id FROM user_data WHERE last_grown = ?",
+                        ("newbie",)).fetchall()
+    
+    if not all_players or \
+        len(all_players) == len(newbie_players):
+        return False
+    return True
