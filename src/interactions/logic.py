@@ -7,7 +7,7 @@ from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 from aiogram.enums import ChatType, ChatMemberStatus
 from aiogram.filters import chat_member_updated
 from datetime import datetime, timedelta
-from random import randint
+from random import randint, choice
 import json, logging
 
 from src.data import database
@@ -233,6 +233,59 @@ async def user_privelege_downgrade_logic(event: chat_member_updated.ChatMemberUp
 is no longer admin in {event.chat.full_name} {event.chat.id}")
 
 
+async def mute_logic(msg: Message) -> bool:
+    """
+        #### Mute logic core
+        Increases mute counter. 
+        
+        When reaches to 3, warns player, on 5 mutes them
+        - Returns `False` if user were not warned
+        - Returns `True` if user are warned
+    """
+    player_id = msg.from_user.id
+    database.add_spam_progress(player_id=player_id)
+    flood_messages = database.get_spam_progress(player_id=player_id)
+
+    if flood_messages > 5:
+        # Mute player from 3 to 7 hours
+        mute_delta = randint(3,12)
+        mute_date = datetime.now() + timedelta(hours=mute_delta)
+
+        database.mute_player(till_date=mute_date.strftime("%Y-%m-%d/%H:%M:%S"), player_id=player_id)
+        await bot.send_message(
+            chat_id=msg.chat.id,
+            text=f"Чел ты в муте на {mute_delta}"
+        )
+        return True
+
+    elif flood_messages > 3:
+        await bot.send_message(
+            chat_id=msg.chat.id,
+            text="Нияз хватит",
+            disable_notification=True,
+            reply_to_message_id=msg.message_id,
+            allow_sending_without_reply=True
+        )
+        return True
+    return False
+
+
+def check_if_muted(player_id: int) -> bool:
+    if not database.check_user_in_spam(player_id=player_id):
+        return False
+
+    current_date = datetime.now()
+    till_date = datetime.strptime(database.get_muted_date(player_id=player_id), "%Y-%m-%d/%H:%M:%S")
+
+    muted = database.check_user_is_muted(player_id=player_id)
+
+    if current_date >= till_date and muted:
+        database.unmute_player(player_id=player_id)
+        return False
+
+    return bool(muted)
+
+
 #  ██████╗  █████╗ ███╗   ███╗███████╗    ██╗  ██╗ █████╗ ███╗   ██╗██████╗ ██╗     ███████╗██████╗ ███████╗
 # ██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██║  ██║██╔══██╗████╗  ██║██╔══██╗██║     ██╔════╝██╔══██╗██╔════╝
 # ██║  ███╗███████║██╔████╔██║█████╗      ███████║███████║██╔██╗ ██║██║  ██║██║     █████╗  ██████╔╝███████╗
@@ -241,9 +294,114 @@ is no longer admin in {event.chat.full_name} {event.chat.id}")
 #  ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝    ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝
 
 
+def check_time(user_id: int) -> bool:
+    """
+        ### Checks if 24h are passed since user executed command `N`
+        - Returns `true` if there is "`newbie`" recording in the DB 
+        (a new user attempts to grow raifa for the first time)
+        - Returns `true` if 24h passed
+        - Returns `false` if not
+
+        **Note:** comparation performed thanks to `datetime` instances
+    """
+    # Obtain date on server and last registered user's date
+    current_time = datetime.now()
+    last_growth_time_str = database.get_raifa_growth_date(id=user_id)
+    if last_growth_time_str != "newbie":
+        last_growth_time = datetime.strptime(last_growth_time_str, "%Y-%m-%d/%H:%M:%S")
+
+    if last_growth_time_str == "newbie" or \
+        (last_growth_time and \
+        current_time > (last_growth_time + timedelta(days=1))):
+        return True
+    return False
+
+
+def pick_a_victim(victims: list[int]) -> int:
+    """
+        Here is where victims list assembled
+    """
+    # Dont touch people with smallest raifa - they already suffer a lot
+    victims_pool_counter = round(2/3 * len(victims))        
+    victims_pool: list[int] = []
+
+    # If there is only 1 player you can attack - its you
+    if victims_pool_counter > 2:
+        for i in range(0,victims_pool_counter):
+            victims_pool.append(victims[i])
+    else:
+        victims_pool = victims
+
+    # Observe difference between raifa sizes
+    total_difference = 0
+    if victims_pool_counter != 1:
+        for i in range(0, victims_pool_counter-1):
+            total_difference += abs(victims_pool[i] - victims_pool[i+1])
+    else:
+        total_difference = victims_pool[0]
+    
+    # Define occurance frequency for each user
+    # That is based on difference between raifa sizes
+    array_of_probability = []
+    for i in victims_pool:
+        if i == 0:
+            continue
+
+        array_of_probability.append(round(i/total_difference))
+
+    # And produce a final array
+    total_probability_array = []
+    user_position = 0
+    for i in array_of_probability:
+        for j in range(0, i):
+            total_probability_array.append(user_position)
+        user_position += 1
+
+    return choice(total_probability_array)
+
+
+def success_attack_chanses(
+        victim_id: int, attacker_id: int,
+        total_value: int, members_count: int
+    ) -> list[int]:
+    """
+        ### Here is where success chances computed
+        **Mechanic:** Luck is accumulated when user's raifa size decreases
+    """
+    victim_luck = database.get_player_luck(victim_id)
+    attacker_luck = database.get_player_luck(attacker_id)
+    
+    # Dont let chanses to be 0
+    if total_value % members_count == 0:
+        total_value += randint(1, members_count)
+
+    victim_chances = total_value % members_count * victim_luck
+    attacker_chances = total_value % members_count * attacker_luck
+
+    total_chances = list( 
+        [victim_id for i in range(0, victim_chances)] + \
+        [attacker_id for i in range(0, attacker_chances)] 
+    )
+
+    if not total_chances:
+        return 0
+    return total_chances
+
+
+def get_delta_size(victim_current_size: int) -> int:
+    """
+        Computes the size of raifa attacker has stolen from victim
+    """
+    if victim_current_size > 10:
+        return randint(5,10)
+    else:
+        return randint(1, victim_current_size+1)
+
+
 async def grow_raifa_logic(msg: Message) -> None:
     """
         ### Basically the main purpose of this bot
+        Grows user's raifa
     """
     user_id = msg.from_user.id
     if not database.check_user_exist(id=user_id) and \
@@ -253,50 +411,45 @@ async def grow_raifa_logic(msg: Message) -> None:
 
         database.add_new_user(user_id=user_id, chat_id=chat_id, admin=admin_status)
 
-    # Obtain date data for sender
-    current_time = datetime.now()
-    last_growth_time_str = database.get_raifa_growth_date(id=user_id)
-    if last_growth_time_str != "newbie":
-        last_growth_time = datetime.strptime(last_growth_time_str, "%Y-%m-%d/%H:%M:%S")
-
-    """
-        Check if user attempts to grow raifa
-        within less 24hrs after last try
-        
-        If there is "newbie" recording -
-        A new user attempts to grow raifa for the first time
-
-        Note: comparation are performed on datetime classes
-    """
-
-    if last_growth_time_str == "newbie" or \
-        (last_growth_time and \
-        current_time > (last_growth_time + timedelta(days=1))):
-
-        increment = randint(-10, 10)
-
-        current_size = database.get_raifa_size(id=user_id)
-        new_size = current_size + increment
-
-        # Size of raifa >= 0
-        if new_size < 0:
-            new_size = 0
-
-        current_time_str = current_time.strftime("%Y-%m-%d/%H:%M:%S")
-        database.set_raifa_size(id=user_id, new_size=new_size, date=current_time_str)
-        
-        if increment < 0:
-            await msg.answer(text=f"{msg.from_user.first_name} лошара и территория его Раифы сократилас на {-increment} км\\. Теперь она составляет {new_size} км")
-        else:
-            await msg.answer(text=f"{msg.from_user.first_name} крутой и территория его Раифы увеличинась на {increment} км\\. Теперь она составляет {new_size} км")
+    # If < 24h passed
+    # Warn player not to spam
+    if not check_time(msg.from_user.id):
+        if not await mute_logic(msg):
+            await msg.answer(text=f"Нет нет завоевывай после {database.get_raifa_growth_date(id=user_id).split('/')[1]} завтрашнего для")
         return
-    await msg.answer(text=f"Нет нет завоевывай после {database.get_raifa_growth_date(id=user_id).split('/')[1]} завтрашнего для")
+    
+    # Get user's luck
+    luck = 2 ** database.get_player_luck(id=user_id)
+    if luck > 10:
+        luck = 11
+
+    increment = randint(-10+luck, 11)
+    increased = True
+
+    current_size = database.get_raifa_size(id=user_id)
+    new_size = current_size + increment
+
+    # Size of raifa >= 0
+    if new_size < 0:
+        new_size = 0
+    
+    if increment < 0:
+        increased = False
+    
+    # Record new growth time for this user
+    current_time_str = datetime.now().strftime("%Y-%m-%d/%H:%M:%S")
+    database.set_raifa_size(id=user_id, new_size=new_size, date=current_time_str, increased=increased)
+    
+    if increment < 0:
+        await msg.answer(text=f"{msg.from_user.first_name} лошара и территория его Раифы сократилас на {-increment} км\\. Теперь она составляет {new_size} км")
+    else:
+        await msg.answer(text=f"{msg.from_user.first_name} крутой и территория его Раифы увеличинась на {increment} км\\. Теперь она составляет {new_size} км")
     return
 
 
-async def show_statistics_logic(chat_id: int):
+async def show_statistics_logic(chat_id: int) -> None:
     """
-        Shows top raifas
+        ### Shows top raifas in this chat
     """
     players = database.get_raifa_statistics(chat_id=chat_id)
     if players:
@@ -317,7 +470,7 @@ async def show_statistics_logic(chat_id: int):
         # If no one executed /raifa yest
         if not database.inspect_raifa_command_execution(chat_id=chat_id):
             await bot.send_message(
-                text="Пока еще никто не растил раифу\\. Будь первым\\!",
+                text="Пока еще никто не расширял территорию Раифы\\. Будь первым\\!",
                 chat_id=chat_id
             )
             return
@@ -329,7 +482,100 @@ async def show_statistics_logic(chat_id: int):
         return
     
     await bot.send_message(
-        text="Пока еще никто не растил раифу\\. Будь первым\\!",
+        text="Пока еще никто не расширял территорию Раифы\\. Будь первым\\!",
         chat_id=chat_id
     )
     return
+
+
+async def attack_logic(msg: Message) -> None:
+    chat_id = msg.chat.id
+    attacker_id = msg.from_user.id
+
+    victims_list = database.get_raifa_statistics(chat_id=chat_id)
+    # If no victims exist - exit
+    if not victims_list:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=f"{msg.from_user.first_name}, ты на кого нападать собрался?"
+        )
+        return
+    
+    # This command may be executed once after 24h. Check the time!
+    if not check_time(user_id=attacker_id):
+        if not await mute_logic(msg):
+            await bot.send_message(
+                chat_id=chat_id,
+                text="А ВОТ И НЕТ ИДИ НАЗУЙ"
+            )
+        return
+    
+    # Obtain only raifa sizes and sort them
+    victims_list_v = map(lambda x: x[1], database.get_raifa_statistics(chat_id=chat_id))
+    victims_list_sorted = sorted(victims_list, key=lambda x: x[1], reverse=True)
+    victims_list_v_sorted = sorted(victims_list_v, reverse=True)
+
+    raifa_size_attacker = database.get_raifa_size(id=attacker_id)
+    current_date = datetime.now().strftime("%Y-%m-%d/%H:%M:%S")
+
+    # Player can attack iff their size > 10 km
+    if raifa_size_attacker < 1:
+        await bot.send_message(
+        chat_id=chat_id,
+        text=f"{msg.from_user.first_name}, тебе еще слишком рано атаковать, твоя раифа **меньше 1 км**"
+    )
+        return
+
+    # Then pick a random victim
+    victim_index = pick_a_victim(victims_list_v_sorted)
+    victim_id = victims_list_sorted[victim_index][0]
+    victim_info = await bot.get_chat_member(chat_id=chat_id, user_id=victim_id)
+    raifa_size_victim = database.get_raifa_size(id=victim_id)
+
+        
+    """
+        Perform an attack
+        1. User attacked himself
+        2. User successfully attacked
+        3. User lost their attack
+    """
+    if victim_id == attacker_id:
+        await msg.answer(text=f"{msg.from_user.first_name} настолько сильно набухался, что по пьяне напал сам на себя")
+        database.set_raifa_size(id=attacker_id, new_size=raifa_size_attacker, date=current_date, increased=False)
+        return
+    
+    total_size = sum(victims_list_v_sorted)
+
+    # Obtain success chances for attacker
+    chances = success_attack_chanses(
+        victim_id=victim_id, attacker_id=attacker_id,
+        total_value=total_size, members_count=len(victims_list)
+    )
+
+    # Finally obtain winner id
+    winner_id = choice(chances)
+
+    if winner_id == attacker_id:
+        # Attacker won
+        delta_size = get_delta_size(victim_current_size=database.get_raifa_size(id=victim_id))
+
+        await bot.send_message(
+        chat_id=chat_id,
+        text=f"{msg.from_user.first_name} успешно сделал пробитие {victim_info.user.first_name} и отвоевал {abs(delta_size)} км территории"
+    )
+    else:
+        # Attacker lost
+        delta_size = -get_delta_size(victim_current_size=database.get_raifa_size(id=attacker_id))
+
+        await bot.send_message(
+        chat_id=chat_id,
+        text=f"{msg.from_user.first_name} не смог осилить мощь {victim_info.user.first_name} и профукал {abs(delta_size)} км своих территорий"
+    )
+
+    # Record new growth time for this user
+    current_time_str = datetime.now().strftime("%Y-%m-%d/%H:%M:%S")
+    database.set_raifa_size(id=attacker_id, new_size=(raifa_size_attacker + delta_size), date=current_time_str, increased=(delta_size>0))
+
+    # For victim dont record the new time
+    old_victim_time = database.get_raifa_growth_date(id=victim_id)
+    database.set_raifa_size(id=victim_id, new_size=(raifa_size_victim - delta_size), date=old_victim_time, increased=(delta_size<0))

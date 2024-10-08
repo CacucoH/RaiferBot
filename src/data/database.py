@@ -27,7 +27,15 @@ def create_database() -> None:
             user_id INTEGER PRIMARY KEY,
             raifa_size INTEGER,
             chat_id INTEGER,
-            last_grown STRING
+            last_grown STRING,
+            luck INTEGER
+        )""",
+
+        """CREATE TABLE IF NOT EXISTS spammers(
+            user_id INTEGER,
+            messages_count INTEGER,
+            muted INTEGER,
+            till_date STRING
         )"""
     ]
 
@@ -111,8 +119,8 @@ def add_new_user(user_id: int, chat_id: int, admin: int):
 
     c.execute("INSERT INTO usr_chan_connection (user_id, chat_id, admin) VALUES (?, ?, ?)",
               (user_id, chat_id, admin))
-    c.execute("INSERT INTO user_data (user_id, chat_id, raifa_size, last_grown) VALUES (?, ?, ?, ?)",
-              (user_id, chat_id ,0, "newbie"))
+    c.execute("INSERT INTO user_data (user_id, chat_id, raifa_size, last_grown, luck) VALUES (?, ?, ?, ?, ?)",
+              (user_id, chat_id ,0, "newbie", 1))
 
     connection.commit()
     
@@ -141,6 +149,68 @@ def remove_chat(chat_id: int):
     connection.commit()
 
 
+def add_spam_progress(player_id: int) -> None:
+    """
+        Keep track of users that are spamming commands
+    """
+    if check_user_in_spam(player_id=player_id):
+        messages_count = get_spam_progress(player_id=player_id)
+        c.execute("UPDATE spammers SET messages_count=? WHERE user_id=?",
+                  (messages_count+1, player_id,))
+        
+    else:
+        c.execute("INSERT INTO spammers (user_id, messages_count, muted, till_date) VALUES (?,?,?,?)",
+                (player_id, 1, 0, "1970-01-01/12:00:00"))
+
+    connection.commit()
+
+
+def get_spam_progress(player_id: int) -> int:
+    """
+        Counts user's spam messages 
+    """
+    messages = c.execute("SELECT messages_count FROM spammers WHERE user_id=?",
+              (player_id,)).fetchall()
+    
+    if messages[0]:
+        return messages[0][0]
+    return 0
+
+
+def check_user_in_spam(player_id: int) -> bool:
+    user_in_base = c.execute("SELECT user_id FROM spammers WHERE user_id=?",
+                             (player_id,)).fetchall()
+    if user_in_base:
+        return True
+    return False
+
+
+def check_user_is_muted(player_id: int) -> bool:
+    muted = c.execute("SELECT muted FROM spammers WHERE user_id=?",
+                             (player_id,)).fetchall()
+    return muted[0][0]
+
+
+def get_muted_date(player_id: int) -> str:
+    date = c.execute("SELECT till_date FROM spammers WHERE user_id=?",
+                             (player_id,)).fetchall()
+    return date[0][0]
+
+
+def mute_player(till_date: str, player_id: int):
+    c.execute("UPDATE spammers SET muted=?, till_date=? WHERE user_id=?",
+              (1, till_date, player_id,))
+    
+    connection.commit()
+
+
+def unmute_player(player_id: int):
+    c.execute("UPDATE spammers SET muted=0, messages_count=0 WHERE user_id=?",
+              (player_id,))
+    
+    connection.commit()
+
+
 #    ___                                                                      _             
 #   / __|   __ _    _ __     ___      o O O   ___    __ __    ___    _ _     | |_     ___   
 #  | (_ |  / _` |  | '  \   / -_)    o       / -_)   \ V /   / -_)  | ' \    |  _|   (_-<   
@@ -163,15 +233,33 @@ def get_raifa_growth_date(id: int) -> str | None:
     return date[0][0]
 
 
-def set_raifa_size(id: int, new_size: int, date: str) -> None:
-    c.execute("UPDATE user_data SET raifa_size=?, last_grown=? WHERE user_id=?",
-              (new_size, date, id))
+def set_raifa_size(id: int, new_size: int, date: str, increased: bool) -> None:
+    # The luck mechanic is described in logic.py
+    luck = c.execute("SELECT luck FROM user_data WHERE user_id=?",
+                     (id,)).fetchall()
+    if not increased:
+        luck = luck[0][0]
+        luck += 1
+    else:
+        luck = 1
+
+    c.execute("UPDATE user_data SET raifa_size=?, last_grown=?, luck=? WHERE user_id=?",
+              (new_size, date, luck, id))
     
     connection.commit()
 
 
-def get_raifa_statistics(chat_id: int) -> list[dict[str, int]] | None:
+def get_raifa_statistics(chat_id: int) -> list[dict[int, int]] | None:
     players = c.execute("SELECT user_id, raifa_size FROM user_data WHERE chat_id = ?",
+                        (chat_id,)).fetchall()
+
+    if players:
+        return players
+    return
+
+
+def get_players(chat_id: int):
+    players = c.execute("SELECT user_id FROM user_data WHERE chat_id = ?",
                         (chat_id,)).fetchall()
 
     if players:
@@ -196,3 +284,10 @@ def inspect_raifa_command_execution(chat_id: int) -> bool:
         len(all_players) == len(newbie_players):
         return False
     return True
+
+
+def get_player_luck(id: int) -> int:
+    luck = c.execute("SELECT luck FROM user_data WHERE user_id=?",
+              (id,)).fetchall()
+    
+    return luck[0][0]
