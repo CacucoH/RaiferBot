@@ -4,13 +4,12 @@
     that contains all necessary functions
     
 """
-from aiogram.types import (InlineKeyboardMarkup, InlineKeyboardButton, \
-    ReplyKeyboardMarkup, KeyboardButton, Message, CallbackQuery)
+from aiogram.types import Message, CallbackQuery
 from aiogram import types, F, Router
 
 from aiogram.enums import ChatType
 from aiogram.filters import (Command, PROMOTED_TRANSITION, JOIN_TRANSITION, \
-                             IS_MEMBER, LEAVE_TRANSITION, chat_member_updated)
+                             LEAVE_TRANSITION, chat_member_updated)
 
 from src.interactions import logic, my_filters
 from main import bot
@@ -55,7 +54,7 @@ async def start_handler(msg: Message) -> None:
 
 @private_router.message(F.content_type.in_({'text', 'sticker'}))
 async def message_reply(msg: Message) -> None:
-    prem = {None:"лох", True:"крутой"}
+    prem = {None:"без премки", True:"крутой"}
     await msg.answer(f"Ты знал что ты {msg.from_user.first_name} и еще ты {prem[msg.from_user.is_premium]}")
 
 
@@ -65,8 +64,8 @@ async def message_reply(msg: Message) -> None:
 
 
 @private_router.callback_query(F.data == "rules")
-async def rules(call: CallbackQuery):
-    await logic.show_rules(call)
+async def show_rules(call: CallbackQuery):
+    await logic.show_rules_dm(call)
 
 
 @private_router.callback_query(F.data == "lesgo")
@@ -178,7 +177,3 @@ async def attack(msg: Message):
 
     if not muted:
         await logic.attack_logic(msg=msg)
-
-
-# @group_router.message(Command("rules"))
-# async def show_rules():

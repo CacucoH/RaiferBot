@@ -36,9 +36,12 @@ def get_start_message(user_id: int) -> str:
     return json_data["RU"]["DM_MENU"]["GREETS"][f"greet_{randint(1,3)}"]
 
 
-async def show_rules(callback: CallbackQuery):
-    reply_markup = [[InlineKeyboardButton(text="В меню", callback_data="exit_main_menu")]]
-    await callback.message.edit_text(text=json_data["RU"]["DM_MENU"]["RULES"]["rules_DM"])
+async def show_rules_dm(callback: CallbackQuery):
+    reply_markup = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="В меню", callback_data="exit_main_menu")]])
+    await callback.message.edit_text(
+        text=json_data["RU"]["DM_MENU"]["RULES"]["rules_DM"],
+        reply_markup=reply_markup
+    )
 
 
 async def start_handler_logic(
@@ -49,7 +52,10 @@ async def start_handler_logic(
     keyboard = (
         [
             [
-                InlineKeyboardButton(text="Погнали!", callback_data="lesgo")
+                InlineKeyboardButton(text=json_data["RU"]["DM_MENU"]["BUTTONS"]["CHNL_MNG_BUTTON"][f"managing_{randint(1,2)}"], callback_data="lesgo")
+            ],
+            [
+                InlineKeyboardButton(text=json_data["RU"]["DM_MENU"]["BUTTONS"]["RULES"][f"rules_btn_{randint(1,2)}"], callback_data="rules")
             ],
             [
                 InlineKeyboardButton(text="Испытать удачу", url="https://vk.cc/3uBrgx") # Come and see; useful stuff here!
@@ -99,7 +105,8 @@ async def setup_menu_logic(callback: CallbackQuery):
         )
     answer_keyboard.append(
         [
-            InlineKeyboardButton(text="В меню", callback_data="exit_main_menu")
+            InlineKeyboardButton(text=json_data["RU"]["DM_MENU"]["BUTTONS"]["RETURN_MENU"],
+                                 callback_data="exit_main_menu")
         ]
     )
 
@@ -116,10 +123,12 @@ async def setup_chat_logic(callback: CallbackQuery):
     actions_on_channel = (
         [
             [
-                InlineKeyboardButton(text="Удалить бота", callback_data=f"delete_bot_in:{this_chat_id}")
+                InlineKeyboardButton(text=json_data["RU"]["DM_MENU"]["BUTTONS"]["MENU_OPTIONS"]["kick"],
+                                     callback_data=f"delete_bot_in:{this_chat_id}")
             ],
             [
-                InlineKeyboardButton(text="В меню", callback_data="exit_main_menu")
+                InlineKeyboardButton(text=json_data["RU"]["DM_MENU"]["BUTTONS"]["RETURN_MENU"],
+                                     callback_data="exit_main_menu")
             ]
         ]
     )
@@ -252,16 +261,22 @@ async def mute_logic(msg: Message) -> bool:
         mute_date = datetime.now() + timedelta(hours=mute_delta)
 
         database.mute_player(till_date=mute_date.strftime("%Y-%m-%d/%H:%M:%S"), player_id=player_id)
-        await bot.send_message(
-            chat_id=msg.chat.id,
-            text=f"Чел ты в муте на {mute_delta}"
-        )
+
+        text_to_send: str = json_data["RU"]["GAME_PROCESS"]["PLAYER_MUTED"][f"mute_{randint(1,1)}"]
+        text_to_send = text_to_send.replace("{username}", msg.from_user.first_name)
+
+        await msg.answer(text=text_to_send)
         return True
 
     elif flood_messages > 3:
+        text_to_send: str = json_data["RU"]["GAME_PROCESS"]["PLAYER_MUTED"][f"warn_{randint(1,2)}"]
+
+        if not text_to_send == "Нияз хватит":
+            text_to_send = text_to_send.replace("{username}", msg.from_user.first_name)
+
         await bot.send_message(
             chat_id=msg.chat.id,
-            text="Нияз хватит",
+            text=text_to_send,
             disable_notification=True,
             reply_to_message_id=msg.message_id,
             allow_sending_without_reply=True
@@ -286,12 +301,20 @@ def check_if_muted(player_id: int) -> bool:
     return bool(muted)
 
 
+def clean_mute_warnings(player_id: int):
+    if not database.check_user_in_spam(player_id=player_id):
+        return
+
+    database.unmute_player(player_id=player_id)
+
+
+
 #  ██████╗  █████╗ ███╗   ███╗███████╗    ██╗  ██╗ █████╗ ███╗   ██╗██████╗ ██╗     ███████╗██████╗ ███████╗
 # ██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██║  ██║██╔══██╗████╗  ██║██╔══██╗██║     ██╔════╝██╔══██╗██╔════╝
 # ██║  ███╗███████║██╔████╔██║█████╗      ███████║███████║██╔██╗ ██║██║  ██║██║     █████╗  ██████╔╝███████╗
 # ██║   ██║██╔══██║██║╚██╔╝██║██╔══╝      ██╔══██║██╔══██║██║╚██╗██║██║  ██║██║     ██╔══╝  ██╔══██╗╚════██║
 # ╚██████╔╝██║  ██║██║ ╚═╝ ██║███████╗    ██║  ██║██║  ██║██║ ╚████║██████╔╝███████╗███████╗██║  ██║███████║
-#  ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝    ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝
+#  ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝    ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝    
 
 
 def check_time(user_id: int) -> bool:
@@ -315,6 +338,23 @@ def check_time(user_id: int) -> bool:
         current_time > (last_growth_time + timedelta(days=1))):
         return True
     return False
+
+
+def position_in_top(id: int, chat_id: int) -> int:
+    """
+        ### Specifies the current player's rating in the top
+        Note: returns index in human style (i.e first index would be `1`, not `0`)
+    """
+    players = database.get_raifa_statistics(chat_id=chat_id)
+    players_sorted = sorted(players, key=lambda x: x[1], reverse=True)
+
+    index = 0
+    for i in players_sorted:
+        index += 1
+        if i[0] == id:
+            break
+    
+    return index
 
 
 def pick_a_victim(victims: list[int]) -> int:
@@ -404,9 +444,10 @@ async def grow_raifa_logic(msg: Message) -> None:
         Grows user's raifa
     """
     user_id = msg.from_user.id
+    chat_id = msg.chat.id
+
     if not database.check_user_exist(id=user_id) and \
         not msg.from_user.is_bot:
-        chat_id = msg.chat.id
         admin_status = database.get_admin_status(id=user_id, chat_id=chat_id)
 
         database.add_new_user(user_id=user_id, chat_id=chat_id, admin=admin_status)
@@ -415,16 +456,26 @@ async def grow_raifa_logic(msg: Message) -> None:
     # Warn player not to spam
     if not check_time(msg.from_user.id):
         if not await mute_logic(msg):
-            await msg.answer(text=f"Нет нет завоевывай после {database.get_raifa_growth_date(id=user_id).split('/')[1]} завтрашнего для")
+            text_to_send = json_data["RU"]["GAME_PROCESS"]["RAIFA_COMMAND"]["TIME_LIMIT"][f"tl_{randint(1,1)}"]
+            text_to_send = text_to_send.replace("{time}", database.get_raifa_growth_date(id=user_id).split('/')[1])
+
+            await msg.answer(text=text_to_send)
         return
+    
+    # After success time verification we should clear warns
+    # To avoid unwanted player's mute
+    clean_mute_warnings(player_id=user_id)
     
     # Get user's luck
     luck = 2 ** database.get_player_luck(id=user_id)
     if luck > 10:
         luck = 11
 
-    increment = randint(-10+luck, 11)
+    increment = randint(-10+luck, 10)
     increased = True
+
+    if increment == 0:
+        increment = randint(luck, 10)
 
     current_size = database.get_raifa_size(id=user_id)
     new_size = current_size + increment
@@ -439,12 +490,24 @@ async def grow_raifa_logic(msg: Message) -> None:
     # Record new growth time for this user
     current_time_str = datetime.now().strftime("%Y-%m-%d/%H:%M:%S")
     database.set_raifa_size(id=user_id, new_size=new_size, date=current_time_str, increased=increased)
-    
+
+    # Place in the top
+    new_user_position = position_in_top(id=user_id, chat_id=chat_id)
+    text_to_send = "прогер еьлан"
+
     if increment < 0:
-        await msg.answer(text=f"{msg.from_user.first_name} лошара и территория его Раифы сократилас на {-increment} км\\. Теперь она составляет {new_size} км")
+        text_to_send: str = json_data["RU"]["GAME_PROCESS"]["RAIFA_COMMAND"]["INCREASED"][f"size_increased_{randint(1,2)}"]
     else:
-        await msg.answer(text=f"{msg.from_user.first_name} крутой и территория его Раифы увеличинась на {increment} км\\. Теперь она составляет {new_size} км")
-    return
+        text_to_send: str = json_data["RU"]["GAME_PROCESS"]["RAIFA_COMMAND"]["DECREASED"][f"size_decreased_{randint(1,3)}"]
+
+   
+    text_to_send = text_to_send.replace("{username}", msg.from_user.first_name) \
+                .replace("{kmDelta}", str(abs(increment))) \
+                .replace("{kmNew}", str(new_size)) \
+                .replace("{topPlace}", str(new_user_position))
+    print(text_to_send)
+    
+    await msg.answer(text=text_to_send)
 
 
 async def show_statistics_logic(chat_id: int) -> None:
@@ -470,7 +533,7 @@ async def show_statistics_logic(chat_id: int) -> None:
         # If no one executed /raifa yest
         if not database.inspect_raifa_command_execution(chat_id=chat_id):
             await bot.send_message(
-                text="Пока еще никто не расширял территорию Раифы\\. Будь первым\\!",
+                text=json_data["RU"]["GAME_PROCESS"]["STAT_COMMAND"]["no_one_played"],
                 chat_id=chat_id
             )
             return
@@ -482,7 +545,7 @@ async def show_statistics_logic(chat_id: int) -> None:
         return
     
     await bot.send_message(
-        text="Пока еще никто не расширял территорию Раифы\\. Будь первым\\!",
+        text=json_data["RU"]["GAME_PROCESS"]["STAT_COMMAND"]["no_one_played"],
         chat_id=chat_id
     )
     return
@@ -495,20 +558,25 @@ async def attack_logic(msg: Message) -> None:
     victims_list = database.get_raifa_statistics(chat_id=chat_id)
     # If no victims exist - exit
     if not victims_list:
+        text_to_send: str = json_data["RU"]["GAME_PROCESS"]["ATTACK_COMMAND"]["no_players_to_attack"]
+        text_to_send = text_to_send.replace("{username}", msg.from_user.first_name)
+
         await bot.send_message(
             chat_id=chat_id,
-            text=f"{msg.from_user.first_name}, ты на кого нападать собрался?"
+            text=text_to_send
         )
         return
     
     # This command may be executed once after 24h. Check the time!
     if not check_time(user_id=attacker_id):
         if not await mute_logic(msg):
-            await bot.send_message(
-                chat_id=chat_id,
-                text="А ВОТ И НЕТ ИДИ НАЗУЙ"
-            )
+            text_to_send = json_data["RU"]["GAME_PROCESS"]["ATTACK_COMMAND"]["TIME_LIMIT"][f"tl_{randint(1,1)}"]
+            text_to_send = text_to_send.replace("{time}", database.get_raifa_growth_date(id=attacker_id).split('/')[1]
+                                                )
+            await msg.answer(text=text_to_send)
         return
+    
+    clean_mute_warnings(player_id=msg.from_user.id)
     
     # Obtain only raifa sizes and sort them
     victims_list_v = map(lambda x: x[1], database.get_raifa_statistics(chat_id=chat_id))
@@ -520,10 +588,10 @@ async def attack_logic(msg: Message) -> None:
 
     # Player can attack iff their size > 10 km
     if raifa_size_attacker < 1:
-        await bot.send_message(
-        chat_id=chat_id,
-        text=f"{msg.from_user.first_name}, тебе еще слишком рано атаковать, твоя раифа **меньше 1 км**"
-    )
+        text_to_send = json_data["RU"]["GAME_PROCESS"]["ATTACK_COMMAND"]["raifa_too_small"]
+        text_to_send = text_to_send.replace("{username}", msg.from_user.first_name)
+
+        await msg.answer(text=text_to_send)
         return
 
     # Then pick a random victim
@@ -540,7 +608,11 @@ async def attack_logic(msg: Message) -> None:
         3. User lost their attack
     """
     if victim_id == attacker_id:
-        await msg.answer(text=f"{msg.from_user.first_name} настолько сильно набухался, что по пьяне напал сам на себя")
+        # User attakced himself. Exit
+        text_to_send = json_data["RU"]["GAME_PROCESS"]["ATTACK_COMMAND"]["SELF_ATTACK"][f"sf_{randint(1,1)}"]
+        text_to_send = text_to_send.replace("{username}", msg.from_user.first_name)
+
+        await msg.answer(text=text_to_send)
         database.set_raifa_size(id=attacker_id, new_size=raifa_size_attacker, date=current_date, increased=False)
         return
     
@@ -554,23 +626,17 @@ async def attack_logic(msg: Message) -> None:
 
     # Finally obtain winner id
     winner_id = choice(chances)
+    text_to_send = "хых"
 
     if winner_id == attacker_id:
         # Attacker won
         delta_size = get_delta_size(victim_current_size=database.get_raifa_size(id=victim_id))
-
-        await bot.send_message(
-        chat_id=chat_id,
-        text=f"{msg.from_user.first_name} успешно сделал пробитие {victim_info.user.first_name} и отвоевал {abs(delta_size)} км территории"
-    )
+        text_to_send = json_data["RU"]["GAME_PROCESS"]["ATTACK_COMMAND"]["ATTACK_SUCCEED"][f"success_{randint(1,1)}"]
     else:
         # Attacker lost
         delta_size = -get_delta_size(victim_current_size=database.get_raifa_size(id=attacker_id))
-
-        await bot.send_message(
-        chat_id=chat_id,
-        text=f"{msg.from_user.first_name} не смог осилить мощь {victim_info.user.first_name} и профукал {abs(delta_size)} км своих территорий"
-    )
+        text_to_send = json_data["RU"]["GAME_PROCESS"]["ATTACK_COMMAND"]["ATTACK_FAILED"][f"fail_{randint(1,1)}"]
+    
 
     # Record new growth time for this user
     current_time_str = datetime.now().strftime("%Y-%m-%d/%H:%M:%S")
@@ -579,3 +645,16 @@ async def attack_logic(msg: Message) -> None:
     # For victim dont record the new time
     old_victim_time = database.get_raifa_growth_date(id=victim_id)
     database.set_raifa_size(id=victim_id, new_size=(raifa_size_victim - delta_size), date=old_victim_time, increased=(delta_size<0))
+    
+    # Get new positions of players in the top
+    new_attacker_position = position_in_top(id=attacker_id, chat_id=chat_id)
+    new_victim_position = position_in_top(id=victim_id, chat_id=chat_id)
+    
+    # Format the text and send to the chat
+    text_to_send = text_to_send.replace("{username}", msg.from_user.first_name) \
+                                .replace("{victim}", victim_info.user.first_name) \
+                                .replace("{deltaSize}", str(abs(delta_size))) \
+                                .replace("{topPlaceAttacker}", str(new_attacker_position)) \
+                                .replace("{topPlaceVictim}", str(new_victim_position))
+    
+    await msg.answer(text=text_to_send)

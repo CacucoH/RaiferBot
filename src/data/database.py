@@ -120,14 +120,12 @@ def add_new_user(user_id: int, chat_id: int, admin: int):
     c.execute("INSERT INTO usr_chan_connection (user_id, chat_id, admin) VALUES (?, ?, ?)",
               (user_id, chat_id, admin))
     c.execute("INSERT INTO user_data (user_id, chat_id, raifa_size, last_grown, luck) VALUES (?, ?, ?, ?, ?)",
-              (user_id, chat_id ,0, "newbie", 1))
+              (user_id, chat_id, 0, "newbie", 228))
 
     connection.commit()
     
     if admin == 0:
-        logging.info(f"User {user_id} wants to play the game and was aded!")
-        return
-    logging.info(f"Admin {user_id} of chat {chat_id} was added successfully")
+        logging.info(f"User {user_id} wants to play the game and were aded!")
 
 
 def remove_user(user_id: int, chat_id: int):
