@@ -25,7 +25,7 @@ Here is the list of available commands and mechanics:
 - `rules`:
 	- Displays rules of this bot
 
-_\*n - If player has 10< points, it lose only from `1` to their current score. Since score becomes >10, player lose from `1` to `10` points _
+\*n - If player has 10< points, it lose only from `1` to their current score. Since score becomes >10, player lose from `1` to `10` points
 
 ## Features
 - No annoying ADS
