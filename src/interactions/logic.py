@@ -27,9 +27,9 @@ with open("./src/data_manipulation/text_data.json", "r") as f:
 # ╚══════╝   ╚═╝   ╚══════╝   ╚═╝   ╚══════╝╚═╝     ╚═╝    ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝
 
 
-def get_start_message(user_id: int) -> str:
+def get_start_message(user_id: int, chat_id: int) -> str:
     # Check if this is first user's occurance
-    user_in_db = database.check_user_exist(user_id)
+    user_in_db = database.check_user_exist(id=user_id, chat_id=chat_id)
 
     if not user_in_db:
         return json_data['RU']['DM_MENU']['GREETS']['user_not_in_db']
@@ -67,7 +67,10 @@ async def start_handler_logic(
     # If command received from a button - edit message
     # If not - send new one
     if callback:
-        text_message = get_start_message(callback.from_user.id)
+        text_message = get_start_message(
+            id=callback.from_user.id,
+            chat_id=callback.from_user.id
+        )
         await callback.message.edit_text(
             text=text_message,
             reply_markup=reply_markup
@@ -79,7 +82,7 @@ async def start_handler_logic(
         return
     
     # Send new greets message to the user
-    text_message = get_start_message(msg.from_user.id)
+    text_message = get_start_message(id=msg.from_user.id, chat_id=msg.from_user.id)
     await bot.send_message(chat_id=msg.from_user.id, text=text_message, reply_markup=reply_markup)
 
 
@@ -146,7 +149,7 @@ async def remove_bot_from_logic(callback: CallbackQuery):
     await bot.leave_chat(chat_id=chat_id)
 
     # Then send regular menu message
-    menu_text = get_start_message(callback.from_user.id)
+    menu_text = get_start_message(id=callback.from_user.id, chat_id=chat_id)
     await start_handler_logic(
         msg=menu_text,
         callback=callback
@@ -262,15 +265,19 @@ async def mute_logic(msg: Message) -> bool:
         - Returns `True` if user are warned
     """
     player_id = msg.from_user.id
-    database.add_spam_progress(player_id=player_id)
-    flood_messages = database.get_spam_progress(player_id=player_id)
+    database.add_spam_progress(player_id, msg.chat.id)
+    flood_messages = database.get_spam_progress(player_id, msg.chat.id)
 
     if flood_messages > 5:
         # Mute player from 3 to 7 hours
         mute_delta = randint(3,12)
         mute_date = datetime.now() + timedelta(hours=mute_delta)
 
-        database.mute_player(till_date=mute_date.strftime("%Y-%m-%d/%H:%M:%S"), player_id=player_id)
+        database.mute_player(
+            till_date=mute_date.strftime("%Y-%m-%d/%H:%M:%S"),
+            player_id=player_id,
+            chat_id=msg.chat.id
+        )
 
         text_to_send: str = json_data['RU']['GAME_PROCESS']['PLAYER_MUTED'][f'mute_{randint(1,3)}']
         text_to_send = text_to_send.replace("{time}", str(mute_delta))
@@ -299,27 +306,27 @@ async def mute_logic(msg: Message) -> bool:
     return False
 
 
-def check_if_muted(player_id: int) -> bool:
-    if not database.check_user_in_spam(player_id=player_id):
+def check_if_muted(player_id: int, chat_id: int) -> bool:
+    if not database.check_user_in_spam(player_id, chat_id):
         return False
 
     current_date = datetime.now()
-    till_date = datetime.strptime(database.get_muted_date(player_id=player_id), "%Y-%m-%d/%H:%M:%S")
+    till_date = datetime.strptime(database.get_muted_date(player_id, chat_id), "%Y-%m-%d/%H:%M:%S")
 
-    muted = database.check_user_is_muted(player_id=player_id)
+    muted = database.check_user_is_muted(player_id=player_id, chat_id=chat_id)
 
     if current_date >= till_date and muted:
-        database.unmute_player(player_id=player_id)
+        database.unmute_player(player_id, chat_id)
         return False
 
     return bool(muted)
 
 
-def clean_mute_warnings(player_id: int):
-    if not database.check_user_in_spam(player_id=player_id):
+def clean_mute_warnings(player_id: int, chat_id: int):
+    if not database.check_user_in_spam(player_id, chat_id):
         return
 
-    database.unmute_player(player_id=player_id)
+    database.unmute_player(player_id, chat_id)
 
 
 
@@ -331,7 +338,7 @@ def clean_mute_warnings(player_id: int):
 #  ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝    ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝    
 
 
-def check_time(user_id: int) -> bool:
+def check_time(user_id: int, chat_id: int) -> bool:
     """
         ### Checks if 24h are passed since user executed command `N`
         - Returns `true` if there is "`newbie`" recording in the DB 
@@ -343,7 +350,7 @@ def check_time(user_id: int) -> bool:
     """
     # Obtain date on server and last registered user's date
     current_time = datetime.now()
-    last_growth_time_str = database.get_raifa_growth_date(id=user_id)
+    last_growth_time_str = database.get_raifa_growth_date(id=user_id, chat_id=chat_id)
     if last_growth_time_str != "newbie":
         last_growth_time = datetime.strptime(last_growth_time_str, "%Y-%m-%d/%H:%M:%S")
 
@@ -360,7 +367,8 @@ def position_in_top(id: int, chat_id: int) -> int:
         Note: returns index in human style (i.e first index would be `1`, not `0`)
     """
     players = database.get_raifa_statistics(chat_id=chat_id)
-    players_sorted = sorted(players, key=lambda x: x[1], reverse=True)
+    if players:
+        players_sorted = sorted(players, key=lambda x: x[1], reverse=True)
 
     index = 0
     for i in players_sorted:
@@ -460,7 +468,7 @@ async def grow_raifa_logic(msg: Message) -> None:
     user_id = msg.from_user.id
     chat_id = msg.chat.id
 
-    if not database.check_user_exist(id=user_id) and \
+    if not database.check_user_exist(id=user_id, chat_id=chat_id) and \
         not msg.from_user.is_bot:
         admin_status = database.get_admin_status(id=user_id, chat_id=chat_id)
 
@@ -468,22 +476,22 @@ async def grow_raifa_logic(msg: Message) -> None:
 
     # If < 24h passed
     # Warn player not to spam
-    if not check_time(msg.from_user.id):
+    if not check_time(msg.from_user.id, chat_id):
         if not await mute_logic(msg):
             text_to_send = json_data['RU']['GAME_PROCESS']['RAIFA_COMMAND']['TIME_LIMIT'][f'tl_{randint(1,1)}']
-            text_to_send = text_to_send.replace("{time}", database.get_raifa_growth_date(id=user_id).split('/')[1])
+            text_to_send = text_to_send.replace("{time}", database.get_raifa_growth_date(id=user_id, chat_id=chat_id).split('/')[1])
 
             await msg.answer(text=text_to_send)
         return
     
     # After success time verification we should clear warns
     # To avoid unwanted player's mute
-    clean_mute_warnings(player_id=user_id)
+    clean_mute_warnings(user_id, chat_id)
     
     # Get user's luck
     luck = 2 ** database.get_player_luck(id=user_id)
 
-    current_raifa_size = database.get_raifa_size(id=user_id)
+    current_raifa_size = database.get_raifa_size(user_id, chat_id)
     if current_raifa_size < 10:
         if luck > current_raifa_size:
             luck = current_raifa_size + 1
@@ -500,7 +508,7 @@ async def grow_raifa_logic(msg: Message) -> None:
     if increment == 0:
         increment = randint(luck, 10)
 
-    current_size = database.get_raifa_size(id=user_id)
+    current_size = database.get_raifa_size(user_id, chat_id)
     new_size = current_size + increment
 
     # Size of raifa >= 0
@@ -512,7 +520,7 @@ async def grow_raifa_logic(msg: Message) -> None:
     
     # Record new growth time for this user
     current_time_str = datetime.now().strftime("%Y-%m-%d/%H:%M:%S")
-    database.set_raifa_size(id=user_id, new_size=new_size, date=current_time_str, increased=increased)
+    database.set_raifa_size(id=user_id, chat_id=chat_id, new_size=new_size, date=current_time_str, increased=increased)
 
     # Place in the top
     new_user_position = position_in_top(id=user_id, chat_id=chat_id)
@@ -603,22 +611,22 @@ async def attack_logic(msg: Message) -> None:
         return
     
     # This command may be executed once after 24h. Check the time!
-    if not check_time(user_id=attacker_id):
+    if not check_time(attacker_id, chat_id):
         if not await mute_logic(msg):
             text_to_send = json_data['RU']['GAME_PROCESS']['ATTACK_COMMAND']['TIME_LIMIT'][f'tl_{randint(1,2)}']
-            text_to_send = text_to_send.replace("{time}", database.get_raifa_growth_date(id=attacker_id).split('/')[1]
+            text_to_send = text_to_send.replace("{time}", database.get_raifa_growth_date(id=attacker_id, chat_id=chat_id).split('/')[1]
                                                 )
             await msg.answer(text=text_to_send)
         return
     
-    clean_mute_warnings(player_id=msg.from_user.id)
+    clean_mute_warnings(attacker_id, chat_id)
     
     # Obtain only raifa sizes and sort them
     victims_list_v = map(lambda x: x[1], database.get_raifa_statistics(chat_id=chat_id))
     victims_list_sorted = sorted(victims_list, key=lambda x: x[1], reverse=True)
     victims_list_v_sorted = sorted(victims_list_v, reverse=True)
 
-    raifa_size_attacker = database.get_raifa_size(id=attacker_id)
+    raifa_size_attacker = database.get_raifa_size(attacker_id, chat_id)
     current_date = datetime.now().strftime("%Y-%m-%d/%H:%M:%S")
 
     # Player can attack iff their size > 10 km
@@ -633,7 +641,7 @@ async def attack_logic(msg: Message) -> None:
     victim_index = pick_a_victim(victims_list_v_sorted)
     victim_id = victims_list_sorted[victim_index][0]
     victim_info = await bot.get_chat_member(chat_id=chat_id, user_id=victim_id)
-    raifa_size_victim = database.get_raifa_size(id=victim_id)
+    raifa_size_victim = database.get_raifa_size(victim_id, chat_id)
 
         
     """
@@ -648,7 +656,7 @@ async def attack_logic(msg: Message) -> None:
         text_to_send = text_to_send.replace("{username}", msg.from_user.first_name)
 
         await msg.answer(text=text_to_send)
-        database.set_raifa_size(id=attacker_id, new_size=raifa_size_attacker, date=current_date, increased=False)
+        database.set_raifa_size(id=attacker_id, chat_id=chat_id, new_size=raifa_size_attacker, date=current_date, increased=False)
         return
     
     total_size = sum(victims_list_v_sorted)
@@ -665,21 +673,21 @@ async def attack_logic(msg: Message) -> None:
 
     if winner_id == attacker_id:
         # Attacker won
-        delta_size = get_delta_size(victim_current_size=database.get_raifa_size(id=victim_id))
+        delta_size = get_delta_size(victim_current_size=database.get_raifa_size(victim_id, chat_id))
         text_to_send = json_data['RU']['GAME_PROCESS']['ATTACK_COMMAND']['ATTACK_SUCCEED'][f'success_{randint(1,3)}']
     else:
         # Attacker lost
-        delta_size = -get_delta_size(victim_current_size=database.get_raifa_size(id=attacker_id))
+        delta_size = -get_delta_size(victim_current_size=database.get_raifa_size(attacker_id, chat_id))
         text_to_send = json_data['RU']['GAME_PROCESS']['ATTACK_COMMAND']['ATTACK_FAILED'][f'fail_{randint(1,3)}']
     
 
     # Record new growth time for this user
     current_time_str = datetime.now().strftime("%Y-%m-%d/%H:%M:%S")
-    database.set_raifa_size(id=attacker_id, new_size=(raifa_size_attacker + delta_size), date=current_time_str, increased=(delta_size>0))
+    database.set_raifa_size(id=attacker_id, chat_id=chat_id, new_size=(raifa_size_attacker + delta_size), date=current_time_str, increased=(delta_size>0))
 
     # For victim dont record the new time
-    old_victim_time = database.get_raifa_growth_date(id=victim_id)
-    database.set_raifa_size(id=victim_id, new_size=(raifa_size_victim - delta_size), date=old_victim_time, increased=(delta_size<0))
+    old_victim_time = database.get_raifa_growth_date(id=victim_id, chat_id=chat_id)
+    database.set_raifa_size(id=victim_id, chat_id=chat_id, new_size=(raifa_size_victim - delta_size), date=old_victim_time, increased=(delta_size<0))
     
     # Get new positions of players in the top
     new_attacker_position = position_in_top(id=attacker_id, chat_id=chat_id)

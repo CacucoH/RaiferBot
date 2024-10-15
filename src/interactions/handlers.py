@@ -160,7 +160,7 @@ async def bot_privelege_downgrade(event: chat_member_updated.ChatMemberUpdated):
 
 @group_router.message(Command("raifa"))
 async def grow_raifa(msg: Message):
-    muted = logic.check_if_muted(msg.from_user.id)
+    muted = logic.check_if_muted(msg.from_user.id, msg.chat.id)
     
     if not muted:
         await logic.grow_raifa_logic(msg)
@@ -168,7 +168,7 @@ async def grow_raifa(msg: Message):
 
 @group_router.message(Command("stat"))
 async def show_statistics(msg: Message):
-    muted = logic.check_if_muted(msg.from_user.id)
+    muted = logic.check_if_muted(msg.from_user.id, msg.chat.id)
 
     if not muted:
         await logic.show_statistics_logic(chat_id=msg.chat.id)
@@ -176,7 +176,7 @@ async def show_statistics(msg: Message):
 
 @group_router.message(Command("attack"))
 async def attack(msg: Message):
-    muted = logic.check_if_muted(msg.from_user.id)
+    muted = logic.check_if_muted(msg.from_user.id, msg.chat.id)
 
     if not muted:
         await logic.attack_logic(msg=msg)

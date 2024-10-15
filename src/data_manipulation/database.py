@@ -18,13 +18,13 @@ c = connection.cursor()
 def create_database() -> None:
     sql_statements = [
         """CREATE TABLE IF NOT EXISTS usr_chan_connection(
-            user_id INTEGER PRIMARY KEY,
+            user_id INTEGER,
             chat_id INTEGER,
             admin INTEGER
         )""",
 
         """CREATE TABLE IF NOT EXISTS user_data(
-            user_id INTEGER PRIMARY KEY,
+            user_id INTEGER,
             raifa_size INTEGER,
             chat_id INTEGER,
             last_grown STRING,
@@ -33,6 +33,7 @@ def create_database() -> None:
 
         """CREATE TABLE IF NOT EXISTS spammers(
             user_id INTEGER,
+            chat_id INTEGER,
             messages_count INTEGER,
             muted INTEGER,
             till_date STRING
@@ -59,9 +60,9 @@ create_database()
 # "`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'./o--000'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-' 
 
 
-def check_user_exist(id: int) -> bool:
-    user = c.execute("SELECT user_id FROM usr_chan_connection WHERE user_id=?",
-                     (id,)).fetchall()
+def check_user_exist(id: int, chat_id: int) -> bool:
+    user = c.execute("SELECT user_id FROM usr_chan_connection WHERE user_id=? AND chat_id=?",
+                     (id, chat_id,)).fetchall()
     
     if user:
         return True
@@ -69,12 +70,14 @@ def check_user_exist(id: int) -> bool:
 
 
 def get_admin_status(id: int, chat_id: int) -> bool:
-    if not check_user_exist(id):
+    if not check_user_exist(id=id, chat_id=chat_id):
         return False
     
     user_is_admin = c.execute("SELECT admin FROM usr_chan_connection WHERE user_id=? AND chat_id=?",
                      (id, chat_id)).fetchall()
-    return user_is_admin[0][0] == 1
+    if user_is_admin:
+        return user_is_admin[0][0] == 1
+    return False
 
 
 def get_chat_admins(chat_id: int) -> list[tuple[int]] | None:
@@ -93,7 +96,7 @@ def get_chats_for_user(user_id: int) -> list[tuple[int]] | None:
 
 
 def set_group_admin(id: int, chat_id: int) -> bool:
-    if not check_user_exist(id=id):
+    if not check_user_exist(id=id, chat_id=chat_id):
         add_new_user(user_id=id, chat_id=chat_id, admin=1)
         return True
     
@@ -114,7 +117,7 @@ def revoke_admin(user_id: int, chat_id: int):
 
 
 def add_new_user(user_id: int, chat_id: int, admin: int):
-    if check_user_exist(id=user_id):
+    if check_user_exist(id=user_id, chat_id=chat_id):
         return
 
     c.execute("INSERT INTO usr_chan_connection (user_id, chat_id, admin) VALUES (?, ?, ?)",
@@ -147,64 +150,64 @@ def remove_chat(chat_id: int):
     connection.commit()
 
 
-def add_spam_progress(player_id: int) -> None:
+def add_spam_progress(player_id: int, chat_id: int) -> None:
     """
         Keep track of users that are spamming commands
     """
-    if check_user_in_spam(player_id=player_id):
-        messages_count = get_spam_progress(player_id=player_id)
-        c.execute("UPDATE spammers SET messages_count=? WHERE user_id=?",
-                  (messages_count+1, player_id,))
+    if check_user_in_spam(player_id, chat_id):
+        messages_count = get_spam_progress(player_id, chat_id)
+        c.execute("UPDATE spammers SET messages_count=? WHERE user_id=? AND chat_id=?",
+                  (messages_count+1, player_id, chat_id,))
         
     else:
-        c.execute("INSERT INTO spammers (user_id, messages_count, muted, till_date) VALUES (?,?,?,?)",
-                (player_id, 1, 0, "1970-01-01/12:00:00"))
+        c.execute("INSERT INTO spammers (user_id, chat_id, messages_count, muted, till_date) VALUES (?,?,?,?,?)",
+                (player_id, chat_id, 1, 0, "1970-01-01/12:00:00"))
 
     connection.commit()
 
 
-def get_spam_progress(player_id: int) -> int:
+def get_spam_progress(player_id: int, chat_id: int) -> int:
     """
         Counts user's spam messages 
     """
-    messages = c.execute("SELECT messages_count FROM spammers WHERE user_id=?",
-              (player_id,)).fetchall()
+    messages = c.execute("SELECT messages_count FROM spammers WHERE user_id=? AND chat_id=?",
+              (player_id, chat_id,)).fetchall()
     
     if messages[0]:
         return messages[0][0]
     return 0
 
 
-def check_user_in_spam(player_id: int) -> bool:
-    user_in_base = c.execute("SELECT user_id FROM spammers WHERE user_id=?",
-                             (player_id,)).fetchall()
+def check_user_in_spam(player_id: int, chat_id: int) -> bool:
+    user_in_base = c.execute("SELECT user_id FROM spammers WHERE user_id=? AND chat_id=?",
+                             (player_id, chat_id,)).fetchall()
     if user_in_base:
         return True
     return False
 
 
-def check_user_is_muted(player_id: int) -> bool:
-    muted = c.execute("SELECT muted FROM spammers WHERE user_id=?",
-                             (player_id,)).fetchall()
+def check_user_is_muted(player_id: int, chat_id: int) -> bool:
+    muted = c.execute("SELECT muted FROM spammers WHERE user_id=? AND chat_id=?",
+                             (player_id, chat_id,)).fetchall()
     return muted[0][0]
 
 
-def get_muted_date(player_id: int) -> str:
-    date = c.execute("SELECT till_date FROM spammers WHERE user_id=?",
-                             (player_id,)).fetchall()
+def get_muted_date(player_id: int, chat_id: int) -> str:
+    date = c.execute("SELECT till_date FROM spammers WHERE user_id=? AND chat_id=?",
+                             (player_id, chat_id,)).fetchall()
     return date[0][0]
 
 
-def mute_player(till_date: str, player_id: int):
-    c.execute("UPDATE spammers SET muted=?, till_date=? WHERE user_id=?",
-              (1, till_date, player_id,))
+def mute_player(till_date: str, player_id: int, chat_id: int):
+    c.execute("UPDATE spammers SET muted=?, till_date=? WHERE user_id=? AND chat_id=?",
+              (1, till_date, player_id, chat_id,))
     
     connection.commit()
 
 
-def unmute_player(player_id: int):
-    c.execute("UPDATE spammers SET muted=0, messages_count=0 WHERE user_id=?",
-              (player_id,))
+def unmute_player(player_id: int, chat_id: int):
+    c.execute("UPDATE spammers SET muted=0, messages_count=0 WHERE user_id=? AND chat_id=?",
+              (player_id, chat_id,))
     
     connection.commit()
 
@@ -217,32 +220,32 @@ def unmute_player(player_id: int):
 # "`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'./o--000'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-'"`-0-0-' 
 
 
-def get_raifa_size(id: int) -> int:
-    size = c.execute("SELECT raifa_size FROM user_data WHERE user_id=?",
-                     (id,)).fetchall()
+def get_raifa_size(id: int, chat_id: int) -> int:
+    size = c.execute("SELECT raifa_size FROM user_data WHERE user_id=? AND chat_id=?",
+                     (id, chat_id,)).fetchall()
     
     return size[0][0]
 
 
-def get_raifa_growth_date(id: int) -> str | None:
-    date = c.execute("SELECT last_grown FROM user_data WHERE user_id=?",
-                     (id,)).fetchall()
+def get_raifa_growth_date(id: int, chat_id: int) -> str | None:
+    date = c.execute("SELECT last_grown FROM user_data WHERE user_id=? AND chat_id=?",
+                     (id, chat_id,)).fetchall()
     
     return date[0][0]
 
 
-def set_raifa_size(id: int, new_size: int, date: str, increased: bool) -> None:
+def set_raifa_size(id: int, chat_id: int, new_size: int, date: str, increased: bool) -> None:
     # The luck mechanic is described in logic.py
-    luck = c.execute("SELECT luck FROM user_data WHERE user_id=?",
-                     (id,)).fetchall()
+    luck = c.execute("SELECT luck FROM user_data WHERE user_id=? AND chat_id=?",
+                     (id, chat_id,)).fetchall()
     if not increased:
         luck = luck[0][0]
         luck += 1
     else:
         luck = 1
 
-    c.execute("UPDATE user_data SET raifa_size=?, last_grown=?, luck=? WHERE user_id=?",
-              (new_size, date, luck, id))
+    c.execute("UPDATE user_data SET raifa_size=?, last_grown=?, luck=? WHERE user_id=? AND chat_id=?",
+              (new_size, date, luck, id, chat_id))
     
     connection.commit()
 
@@ -275,8 +278,8 @@ def inspect_raifa_command_execution(chat_id: int) -> bool:
     all_players = c.execute("SELECT user_id FROM user_data WHERE chat_id = ?",
                         (chat_id,)).fetchall()
     
-    newbie_players = c.execute("SELECT user_id FROM user_data WHERE last_grown = ?",
-                        ("newbie",)).fetchall()
+    newbie_players = c.execute("SELECT user_id FROM user_data WHERE last_grown = ? AND chat_id=?",
+                        ("newbie", chat_id,)).fetchall()
     
     if not all_players or \
         len(all_players) == len(newbie_players):
