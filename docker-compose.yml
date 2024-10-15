@@ -13,3 +13,4 @@ services:
       - /var/bot/data/:/app/src/app_data/
     env_file:
       - .env
+    restart: always
