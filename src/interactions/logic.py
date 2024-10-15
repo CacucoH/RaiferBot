@@ -262,14 +262,14 @@ async def mute_logic(msg: Message) -> bool:
 
         database.mute_player(till_date=mute_date.strftime("%Y-%m-%d/%H:%M:%S"), player_id=player_id)
 
-        text_to_send: str = json_data["RU"]["GAME_PROCESS"]["PLAYER_MUTED"][f"mute_{randint(1,1)}"]
+        text_to_send: str = json_data["RU"]["GAME_PROCESS"]["PLAYER_MUTED"][f"mute_{randint(1,3)}"]
         text_to_send = text_to_send.replace("{username}", msg.from_user.first_name)
 
         await msg.answer(text=text_to_send)
         return True
 
     elif flood_messages > 3:
-        text_to_send: str = json_data["RU"]["GAME_PROCESS"]["PLAYER_MUTED"][f"warn_{randint(1,2)}"]
+        text_to_send: str = json_data["RU"]["GAME_PROCESS"]["PLAYER_MUTED"][f"warn_{randint(1,3)}"]
 
         if not text_to_send == "Нияз хватит":
             text_to_send = text_to_send.replace("{username}", msg.from_user.first_name)
@@ -496,7 +496,7 @@ async def grow_raifa_logic(msg: Message) -> None:
     text_to_send = "прогер еьлан"
 
     if increment < 0:
-        text_to_send: str = json_data["RU"]["GAME_PROCESS"]["RAIFA_COMMAND"]["INCREASED"][f"size_increased_{randint(1,2)}"]
+        text_to_send: str = json_data["RU"]["GAME_PROCESS"]["RAIFA_COMMAND"]["INCREASED"][f"size_increased_{randint(1,3)}"]
     else:
         text_to_send: str = json_data["RU"]["GAME_PROCESS"]["RAIFA_COMMAND"]["DECREASED"][f"size_decreased_{randint(1,3)}"]
 
@@ -570,7 +570,7 @@ async def attack_logic(msg: Message) -> None:
     # This command may be executed once after 24h. Check the time!
     if not check_time(user_id=attacker_id):
         if not await mute_logic(msg):
-            text_to_send = json_data["RU"]["GAME_PROCESS"]["ATTACK_COMMAND"]["TIME_LIMIT"][f"tl_{randint(1,1)}"]
+            text_to_send = json_data["RU"]["GAME_PROCESS"]["ATTACK_COMMAND"]["TIME_LIMIT"][f"tl_{randint(1,3)}"]
             text_to_send = text_to_send.replace("{time}", database.get_raifa_growth_date(id=attacker_id).split('/')[1]
                                                 )
             await msg.answer(text=text_to_send)
@@ -609,7 +609,7 @@ async def attack_logic(msg: Message) -> None:
     """
     if victim_id == attacker_id:
         # User attakced himself. Exit
-        text_to_send = json_data["RU"]["GAME_PROCESS"]["ATTACK_COMMAND"]["SELF_ATTACK"][f"sf_{randint(1,1)}"]
+        text_to_send = json_data["RU"]["GAME_PROCESS"]["ATTACK_COMMAND"]["SELF_ATTACK"][f"sf_{randint(1,3)}"]
         text_to_send = text_to_send.replace("{username}", msg.from_user.first_name)
 
         await msg.answer(text=text_to_send)
@@ -631,11 +631,11 @@ async def attack_logic(msg: Message) -> None:
     if winner_id == attacker_id:
         # Attacker won
         delta_size = get_delta_size(victim_current_size=database.get_raifa_size(id=victim_id))
-        text_to_send = json_data["RU"]["GAME_PROCESS"]["ATTACK_COMMAND"]["ATTACK_SUCCEED"][f"success_{randint(1,1)}"]
+        text_to_send = json_data["RU"]["GAME_PROCESS"]["ATTACK_COMMAND"]["ATTACK_SUCCEED"][f"success_{randint(1,3)}"]
     else:
         # Attacker lost
         delta_size = -get_delta_size(victim_current_size=database.get_raifa_size(id=attacker_id))
-        text_to_send = json_data["RU"]["GAME_PROCESS"]["ATTACK_COMMAND"]["ATTACK_FAILED"][f"fail_{randint(1,1)}"]
+        text_to_send = json_data["RU"]["GAME_PROCESS"]["ATTACK_COMMAND"]["ATTACK_FAILED"][f"fail_{randint(1,3)}"]
     
 
     # Record new growth time for this user
