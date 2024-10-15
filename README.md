@@ -33,13 +33,17 @@ Here is the list of available commands and mechanics:
 - Funny stuff
 ## Deployed versions
 The **stable** version are located at the `main` branch
+
 The **newest** versions are located into `test` branch
 ### Installation
 This code might be used as pure code or inside a container.
+
 To launch it as a docker container, just build it and run
 ```
 docker-compose up --build -d
 ```
 Container would start automatically on system startup
+#### ⚠️ IMPORTANT
+**Don't forget to insert your bot token in `.env` file**. You can obtain Telegram API token from [Bot Father](https://t.me/BotFather)
 ## Licence
 **MIT licence** is used in this project
