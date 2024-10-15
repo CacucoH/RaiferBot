@@ -1,0 +1,15 @@
+version: "2"
+
+services:
+  raifa_bot:
+    build: .
+    container_name: RaiferBot
+    image: raifer_bot
+    command: python3 main.py
+    ports:
+      - 5000:5000
+    volumes:
+      - ./:/app/
+      - /var/bot/data/:/app/src/app_data/
+    env_file:
+      - .env

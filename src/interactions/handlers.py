@@ -168,7 +168,10 @@ async def grow_raifa(msg: Message):
 
 @group_router.message(Command("stat"))
 async def show_statistics(msg: Message):
-    await logic.show_statistics_logic(chat_id=msg.chat.id)
+    muted = logic.check_if_muted(msg.from_user.id)
+
+    if not muted:
+        await logic.show_statistics_logic(chat_id=msg.chat.id)
 
 
 @group_router.message(Command("attack"))

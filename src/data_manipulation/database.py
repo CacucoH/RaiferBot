@@ -7,7 +7,7 @@ import logging
 
 
 # Connect to db
-connection = sqlite3.connect(r"./src/data/raifa.db")
+connection = sqlite3.connect(r"./src/app_data/raifa.db")
 c = connection.cursor()
 
 
@@ -125,7 +125,7 @@ def add_new_user(user_id: int, chat_id: int, admin: int):
     connection.commit()
     
     if admin == 0:
-        logging.info(f"User {user_id} wants to play the game and were aded!")
+        logging.info(f"User {user_id} wants to play the game and were added!")
 
 
 def remove_user(user_id: int, chat_id: int):

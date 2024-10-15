@@ -8,6 +8,7 @@ from aiogram.enums.parse_mode import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram import Dispatcher, Bot
 from dotenv import load_dotenv
+from datetime import datetime
 
 
 # Create an Disptcher instance and load env data
@@ -45,10 +46,14 @@ async def main():
                            
 
 if __name__ == "__main__":
-    # TODO: add filehandler instead of streamhandler
+    today = datetime.now().strftime("%Y-%m-%d_%H-%M")
+
+    # Write logs
     logging.basicConfig(
         level=logging.INFO, 
         format="[%(levelname)s] - %(asctime)s - %(message)s",
-        datefmt="%Y/%m/%d %H:%M:%S"
+        datefmt="%Y/%m/%d %H:%M:%S",
+        filename=f"./src/app_data/log_{today}.log",
+        filemode="a"
     )
     asyncio.run(main())
