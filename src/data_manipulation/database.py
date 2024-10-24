@@ -7,7 +7,7 @@ import logging
 
 
 # Connect to db
-connection = sqlite3.connect(r"./src/app_data/raifa.db")
+connection = sqlite3.connect(r"./src/data/raifa.db")
 c = connection.cursor()
 
 
@@ -113,7 +113,7 @@ def revoke_admin(user_id: int, chat_id: int):
               (user_id, chat_id,))
     
     connection.commit()
-    logging.info(f"Admin priv. was removed from {user_id} in {chat_id}")
+    logging.debug(f"Admin priv. was removed from {user_id} in {chat_id}")
 
 
 def add_new_user(user_id: int, chat_id: int, admin: int):
@@ -128,7 +128,7 @@ def add_new_user(user_id: int, chat_id: int, admin: int):
     connection.commit()
     
     if admin == 0:
-        logging.info(f"User {user_id} wants to play the game and were added!")
+        logging.debug(f"User {user_id} wants to play the game and were added!")
 
 
 def remove_user(user_id: int, chat_id: int):

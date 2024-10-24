@@ -5,12 +5,16 @@ services:
     build: .
     container_name: RaiferBot
     image: raifer_bot
-    command: python3 main.py
+    command: >
+      bash -c "python3 main.py
+      && mkdir ./src/data
+      && mkdir ./src/logs"
     ports:
       - 5000:5000
     volumes:
       - ./:/app/
-      - /var/bot/data/:/app/src/app_data/
+      - /home/raifa_bot/data/:/app/src/data/
+      - /tmp/raifa_bot/logs/:/app/src/logs/
     env_file:
       - .env
     restart: always

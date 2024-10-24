@@ -68,7 +68,7 @@ async def start_handler_logic(
     # If not - send new one
     if callback:
         text_message = get_start_message(
-            id=callback.from_user.id,
+            user_id=callback.from_user.id,
             chat_id=callback.from_user.id
         )
         await callback.message.edit_text(
@@ -82,7 +82,7 @@ async def start_handler_logic(
         return
     
     # Send new greets message to the user
-    text_message = get_start_message(id=msg.from_user.id, chat_id=msg.from_user.id)
+    text_message = get_start_message(user_id=msg.from_user.id, chat_id=msg.from_user.id)
     await bot.send_message(chat_id=msg.from_user.id, text=text_message, reply_markup=reply_markup)
 
 
@@ -149,7 +149,7 @@ async def remove_bot_from_logic(callback: CallbackQuery):
     await bot.leave_chat(chat_id=chat_id)
 
     # Then send regular menu message
-    menu_text = get_start_message(id=callback.from_user.id, chat_id=chat_id)
+    menu_text = get_start_message(user_id=callback.from_user.id, chat_id=chat_id)
     await start_handler_logic(
         msg=menu_text,
         callback=callback
@@ -158,7 +158,7 @@ async def remove_bot_from_logic(callback: CallbackQuery):
 
 async def bot_added_to_chat_logic(event: chat_member_updated.ChatMemberUpdated):
     # Check if bot itself was added
-    logging.info(f"Bot {event.new_chat_member.user.full_name} was added to {event.chat.full_name}; Status {event.new_chat_member.status}")
+    logging.debug(f"Bot {event.new_chat_member.user.full_name} was added to {event.chat.full_name}; Status {event.new_chat_member.status}")
     admins = await bot.get_chat_administrators(event.chat.id)
 
     # Add admins to the database
@@ -167,9 +167,9 @@ async def bot_added_to_chat_logic(event: chat_member_updated.ChatMemberUpdated):
         if not i.user.is_bot: 
             # Should i record this bot as admin? (or \ i.user.id == bot.id:)
             if database.set_group_admin(id=i.user.id, chat_id=event.chat.id):
-                logging.info(f"Admin {i.user.full_name} in {event.chat.full_name} ({event.chat.id}) was added")
+                logging.debug(f"Admin {i.user.full_name} in {event.chat.full_name} ({event.chat.id}) was added")
             else:
-                logging.info(f"Admin {i.user.full_name} in {event.chat.full_name} already exists in db")
+                logging.debug(f"Admin {i.user.full_name} in {event.chat.full_name} already exists in db")
 
     # Send a message with rules
     await bot.send_message(
@@ -239,7 +239,7 @@ async def someone_kicked_from_chat_logic(event: chat_member_updated.ChatMemberUp
 
 async def user_privelege_escalated_logic(event: chat_member_updated.ChatMemberUpdated):
     database.set_group_admin(id=event.new_chat_member.user.id, chat_id=event.chat.id)
-    logging.info(f"{event.new_chat_member.user.full_name} ({event.new_chat_member.user.id}) \
+    logging.debug(f"{event.new_chat_member.user.full_name} ({event.new_chat_member.user.id}) \
 is now admin in {event.chat.full_name} {event.chat.id}")
 
 
@@ -251,7 +251,7 @@ async def user_privelege_downgrade_logic(event: chat_member_updated.ChatMemberUp
     
     # Remove info about ex-admin
     database.revoke_admin(user_id=event.new_chat_member.user.id, chat_id=event.chat.id)
-    logging.info(f"{event.new_chat_member.user.full_name} ({event.new_chat_member.user.id}) \
+    logging.debug(f"{event.new_chat_member.user.full_name} ({event.new_chat_member.user.id}) \
 is no longer admin in {event.chat.full_name} {event.chat.id}")
 
 

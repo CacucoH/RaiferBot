@@ -53,7 +53,7 @@ if __name__ == "__main__":
         level=logging.INFO, 
         format="[%(levelname)s] - %(asctime)s - %(message)s",
         datefmt="%Y/%m/%d %H:%M:%S",
-        filename=f"./src/app_data/log_{today}.log",
+        filename=f"./src/logs/log_{today}.log",
         filemode="a"
     )
     asyncio.run(main())
