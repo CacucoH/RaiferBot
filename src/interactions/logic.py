@@ -29,7 +29,7 @@ with open("./src/data_manipulation/text_data.json", "r") as f:
 
 def get_start_message(user_id: int, chat_id: int) -> str:
     # Check if this is first user's occurance
-    user_in_db = database.check_user_exist(id=user_id, chat_id=chat_id)
+    user_in_db = database.check_user_exist_v2(id=user_id, chat_id=chat_id)
 
     if not user_in_db:
         return json_data['RU']['DM_MENU']['GREETS']['user_not_in_db']
@@ -100,10 +100,14 @@ async def setup_menu_logic(callback: CallbackQuery):
     answer_keyboard = []
     for i in this_usr_chats:
         chat_info = await bot.get_chat(chat_id=i[0])
+        chat_name = chat_info.full_name
+        
+        if len(chat_name) > 9:
+            chat_name = f"{chat_name}..."
 
         answer_keyboard.append(
             [
-                InlineKeyboardButton(text=f"{chat_info.full_name}", callback_data=f"setup_channel:{chat_info.id}")
+                InlineKeyboardButton(text=f"{chat_name}", callback_data=f"setup_channel:{chat_info.id}")
             ]
         )
     answer_keyboard.append(
@@ -354,10 +358,15 @@ def check_time(user_id: int, chat_id: int) -> bool:
     if last_growth_time_str != "newbie":
         last_growth_time = datetime.strptime(last_growth_time_str, "%Y-%m-%d/%H:%M:%S")
 
+    logging.debug(f"User {user_id} requested growth/attack. Last growth {last_growth_time_str}, today is {current_time.strftime("%Y-%m-%d/%H:%M:%S")}")
+
     if last_growth_time_str == "newbie" or \
         (last_growth_time and \
         current_time > (last_growth_time + timedelta(days=1))):
+        logging.debug(f"Growth granted")
         return True
+    
+    logging.debug(f"Growth denied")
     return False
 
 
@@ -478,7 +487,7 @@ async def grow_raifa_logic(msg: Message) -> None:
     # Warn player not to spam
     if not check_time(msg.from_user.id, chat_id):
         if not await mute_logic(msg):
-            text_to_send = json_data['RU']['GAME_PROCESS']['RAIFA_COMMAND']['TIME_LIMIT'][f'tl_{randint(1,1)}']
+            text_to_send = json_data['RU']['GAME_PROCESS']['RAIFA_COMMAND']['TIME_LIMIT'][f'tl_{randint(1,3)}']
             text_to_send = text_to_send.replace("{time}", database.get_raifa_growth_date(id=user_id, chat_id=chat_id).split('/')[1])
 
             await msg.answer(text=text_to_send)
@@ -555,7 +564,7 @@ async def show_statistics_logic(chat_id: int) -> None:
         # Display only first 10 players
         counter = 1
         for i in players:
-            if counter == 10:
+            if counter == 11:
                 break
 
             player_id = i[0]
@@ -699,5 +708,5 @@ async def attack_logic(msg: Message) -> None:
                                 .replace("{deltaSize}", str(abs(delta_size))) \
                                 .replace("{topPlaceAttacker}", str(new_attacker_position)) \
                                 .replace("{topPlaceVictim}", str(new_victim_position))
-    
+
     await msg.answer(text=text_to_send)

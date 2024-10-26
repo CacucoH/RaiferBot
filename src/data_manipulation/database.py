@@ -61,8 +61,19 @@ create_database()
 
 
 def check_user_exist(id: int, chat_id: int) -> bool:
+    """ONLY FOR CHATS"""
     user = c.execute("SELECT user_id FROM usr_chan_connection WHERE user_id=? AND chat_id=?",
                      (id, chat_id,)).fetchall()
+    
+    if user:
+        return True
+    return False
+
+
+def check_user_exist_v2(id: int) -> bool:
+    """CHECK IF USER EXIST IN DB"""
+    user = c.execute("SELECT user_id FROM usr_chan_connection WHERE user_id=?",
+                     (id,)).fetchall()
     
     if user:
         return True

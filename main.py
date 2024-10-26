@@ -50,7 +50,7 @@ if __name__ == "__main__":
 
     # Write logs
     logging.basicConfig(
-        level=logging.INFO, 
+        level=logging.DEBUG, 
         format="[%(levelname)s] - %(asctime)s - %(message)s",
         datefmt="%Y/%m/%d %H:%M:%S",
         filename=f"./src/logs/log_{today}.log",
