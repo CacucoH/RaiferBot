@@ -180,3 +180,8 @@ async def attack(msg: Message):
 
     if not muted:
         await logic.attack_logic(msg=msg)
+
+@group_router.message()
+async def idi_naxyu(msg: Message):
+    if msg.text.lower() == "иди нахуй":
+        msg.answer("Сам иди")
