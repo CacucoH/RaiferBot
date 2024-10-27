@@ -29,7 +29,7 @@ with open("./src/data_manipulation/text_data.json", "r") as f:
 
 def get_start_message(user_id: int, chat_id: int) -> str:
     # Check if this is first user's occurance
-    user_in_db = database.check_user_exist_v2(id=user_id, chat_id=chat_id)
+    user_in_db = database.check_user_exist_v2(id=user_id)
 
     if not user_in_db:
         return json_data['RU']['DM_MENU']['GREETS']['user_not_in_db']
@@ -278,7 +278,7 @@ async def mute_logic(msg: Message) -> bool:
         mute_date = datetime.now() + timedelta(hours=mute_delta)
 
         database.mute_player(
-            till_date=mute_date.strftime("%Y-%m-%d/%H:%M:%S"),
+            till_date=mute_date.strftime("%Y-%m-%d/%H:%M"),
             player_id=player_id,
             chat_id=msg.chat.id
         )
@@ -315,7 +315,7 @@ def check_if_muted(player_id: int, chat_id: int) -> bool:
         return False
 
     current_date = datetime.now()
-    till_date = datetime.strptime(database.get_muted_date(player_id, chat_id), "%Y-%m-%d/%H:%M:%S")
+    till_date = datetime.strptime(database.get_muted_date(player_id, chat_id), "%Y-%m-%d/%H:%M")
 
     muted = database.check_user_is_muted(player_id=player_id, chat_id=chat_id)
 
@@ -342,6 +342,21 @@ def clean_mute_warnings(player_id: int, chat_id: int):
 #  ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝    ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝    
 
 
+def may_grow_today(growth_date_str: str) -> bool:
+    """
+        ### Displays tomorrow/today
+        - If user may grow raifa only tomorrow, returns `false`
+        - Else returns `true`
+    """
+    today = datetime.now()
+    growth_date = datetime.strptime(growth_date_str, "%Y-%m-%d") + timedelta(days=1)
+
+    return \
+        today.day == growth_date.day and \
+        today.month == growth_date.month and \
+        today.year == growth_date.year
+
+
 def check_time(user_id: int, chat_id: int) -> bool:
     """
         ### Checks if 24h are passed since user executed command `N`
@@ -356,9 +371,9 @@ def check_time(user_id: int, chat_id: int) -> bool:
     current_time = datetime.now()
     last_growth_time_str = database.get_raifa_growth_date(id=user_id, chat_id=chat_id)
     if last_growth_time_str != "newbie":
-        last_growth_time = datetime.strptime(last_growth_time_str, "%Y-%m-%d/%H:%M:%S")
+        last_growth_time = datetime.strptime(last_growth_time_str, "%Y-%m-%d/%H:%M")
 
-    logging.debug(f"User {user_id} requested growth/attack. Last growth {last_growth_time_str}, today is {current_time.strftime("%Y-%m-%d/%H:%M:%S")}")
+    logging.debug(f"User {user_id} requested growth/attack. Last growth {last_growth_time_str}, today is {current_time.strftime('%Y-%m-%d/%H:%M:%S')}")
 
     if last_growth_time_str == "newbie" or \
         (last_growth_time and \
@@ -466,13 +481,13 @@ def get_delta_size(victim_current_size: int) -> int:
     if victim_current_size > 10:
         return randint(5,10)
     else:
-        return randint(1, victim_current_size+1)
+        return randint(1, victim_current_size)
 
 
 async def grow_raifa_logic(msg: Message) -> None:
     """
         ### Basically the main purpose of this bot
-        Grows user's raifa
+        Grows/decreases user's raifa
     """
     user_id = msg.from_user.id
     chat_id = msg.chat.id
@@ -488,7 +503,10 @@ async def grow_raifa_logic(msg: Message) -> None:
     if not check_time(msg.from_user.id, chat_id):
         if not await mute_logic(msg):
             text_to_send = json_data['RU']['GAME_PROCESS']['RAIFA_COMMAND']['TIME_LIMIT'][f'tl_{randint(1,3)}']
-            text_to_send = text_to_send.replace("{time}", database.get_raifa_growth_date(id=user_id, chat_id=chat_id).split('/')[1])
+
+            growth_date = database.get_raifa_growth_date(id=user_id, chat_id=chat_id).split('/')
+            text_to_send = text_to_send.replace("{time}", growth_date[1]) \
+                                       .replace("{dayMark}", json_data['RU']['GAME_PROCESS']['IS_TODAY'][str(may_grow_today(growth_date[0]))])
 
             await msg.answer(text=text_to_send)
         return
@@ -528,7 +546,7 @@ async def grow_raifa_logic(msg: Message) -> None:
         increased = False
     
     # Record new growth time for this user
-    current_time_str = datetime.now().strftime("%Y-%m-%d/%H:%M:%S")
+    current_time_str = datetime.now().strftime("%Y-%m-%d/%H:%M")
     database.set_raifa_size(id=user_id, chat_id=chat_id, new_size=new_size, date=current_time_str, increased=increased)
 
     # Place in the top
@@ -636,7 +654,7 @@ async def attack_logic(msg: Message) -> None:
     victims_list_v_sorted = sorted(victims_list_v, reverse=True)
 
     raifa_size_attacker = database.get_raifa_size(attacker_id, chat_id)
-    current_date = datetime.now().strftime("%Y-%m-%d/%H:%M:%S")
+    current_date = datetime.now().strftime("%Y-%m-%d/%H:%M")
 
     # Player can attack iff their size > 10 km
     if raifa_size_attacker < 1:
@@ -691,7 +709,7 @@ async def attack_logic(msg: Message) -> None:
     
 
     # Record new growth time for this user
-    current_time_str = datetime.now().strftime("%Y-%m-%d/%H:%M:%S")
+    current_time_str = datetime.now().strftime("%Y-%m-%d/%H:%M")
     database.set_raifa_size(id=attacker_id, chat_id=chat_id, new_size=(raifa_size_attacker + delta_size), date=current_time_str, increased=(delta_size>0))
 
     # For victim dont record the new time
