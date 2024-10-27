@@ -1,4 +1,4 @@
-DIRECTORY = "/tmp/raifa_bot/logs/"
+DIRECTORY = "./src/logs/"
 DAYS_AMOUNT = 2
 
 from datetime import datetime, timedelta
@@ -13,7 +13,9 @@ def iterate(pattern: datetime):
         if file_date <= pattern:
             try:
                 os.remove(i)
-            except:
+                print(f"[i] Removing {i}")
+            except Exception as e:
+                print(f"[!] Failed to remove {i}: {e}")
                 continue
         
 
@@ -21,5 +23,6 @@ def start():
     os.chdir(DIRECTORY)
     old_files = datetime.now() - timedelta(days=DAYS_AMOUNT)
     iterate(old_files)
+    print("\n> Program finished")
 
 start()
