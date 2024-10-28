@@ -373,7 +373,7 @@ def check_time(user_id: int, chat_id: int) -> bool:
     if last_growth_time_str != "newbie":
         last_growth_time = datetime.strptime(last_growth_time_str, "%Y-%m-%d/%H:%M")
 
-    logging.debug(f"User {user_id} requested growth/attack. Last growth {last_growth_time_str}, today is {current_time.strftime('%Y-%m-%d/%H:%M:%S')}")
+    logging.debug(f"User {user_id} requested growth/attack. Last growth {last_growth_time_str}, today is {current_time.strftime('%Y-%m-%d/%H:%M')}")
 
     if last_growth_time_str == "newbie" or \
         (last_growth_time and \
