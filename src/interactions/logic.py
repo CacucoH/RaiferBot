@@ -446,7 +446,7 @@ def pick_a_victim(victims: list[int]) -> int:
     return choice(total_probability_array)
 
 
-def success_attack_chanses(
+def success_attack_chances(
         victim_id: int, attacker_id: int,
         total_value: int, members_count: int
     ) -> list[int]:
@@ -641,8 +641,10 @@ async def attack_logic(msg: Message) -> None:
     if not check_time(attacker_id, chat_id):
         if not await mute_logic(msg):
             text_to_send = json_data['RU']['GAME_PROCESS']['ATTACK_COMMAND']['TIME_LIMIT'][f'tl_{randint(1,2)}']
-            text_to_send = text_to_send.replace("{time}", database.get_raifa_growth_date(id=attacker_id, chat_id=chat_id).split('/')[1]
-                                                )
+            growth_date = database.get_raifa_growth_date(id=attacker_id, chat_id=chat_id).split('/')
+            text_to_send = text_to_send.replace("{time}", growth_date[1]) \
+                                       .replace("{dayMark}", json_data['RU']['GAME_PROCESS']['IS_TODAY'][str(may_grow_today(growth_date[0]))])
+
             await msg.answer(text=text_to_send)
         return
     
@@ -689,7 +691,7 @@ async def attack_logic(msg: Message) -> None:
     total_size = sum(victims_list_v_sorted)
 
     # Obtain success chances for attacker
-    chances = success_attack_chanses(
+    chances = success_attack_chances(
         victim_id=victim_id, attacker_id=attacker_id,
         total_value=total_size, members_count=len(victims_list)
     )
