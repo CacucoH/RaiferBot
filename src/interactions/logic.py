@@ -448,7 +448,7 @@ def pick_a_victim(victims: list[int]) -> int:
 
 def success_attack_chances(
         victim_id: int, attacker_id: int,
-        total_value: int, members_count: int
+        victim_size: int, attacker_size: int, members_count: int
     ) -> list[int]:
     """
         ### Here is where success chances computed
@@ -456,13 +456,26 @@ def success_attack_chances(
     """
     victim_luck = database.get_player_luck(victim_id)
     attacker_luck = database.get_player_luck(attacker_id)
-    
-    # Dont let chanses to be 0
-    if total_value % members_count == 0:
-        total_value += randint(1, members_count)
 
-    victim_chances = total_value % members_count * victim_luck
-    attacker_chances = total_value % members_count * attacker_luck
+    # Find the difference in sizes
+    delta = abs(attacker_size - victim_size)
+
+    if delta == 0:
+        delta = 1
+
+    # Find the dominance of victim (difference in sizes / size of attacker); can be 0 < and < 1 or >= 1
+    size_coeff = attacker_size / delta
+
+    if attacker_size < victim_size:
+        size_coeff = size_coeff - (victim_size / attacker_size)
+
+        if size_coeff < 0:
+            size_coeff = 1
+
+    # Compute chances
+    victim_chances = victim_luck
+    attacker_chances = round(attacker_luck * size_coeff)
+
 
     total_chances = list( 
         [victim_id for i in range(0, victim_chances)] + \
@@ -585,17 +598,29 @@ async def show_statistics_logic(chat_id: int) -> None:
             if counter == 11:
                 break
 
+            # Display medals
+            medal = ""
+            if counter in [1, 2, 3]:
+                medal = json_data["RU"]["MISC"]["EMOJIS"][str(counter)]
+            
+            if counter == len(players):
+                medal = json_data["RU"]["MISC"]["EMOJIS"]["last"]
+
             player_id = i[0]
             try:
                 player_info = await bot.get_chat_member(user_id=player_id, chat_id=chat_id)
             except TelegramBadRequest:
                 continue
-            
+
             player_nick = player_info.user.full_name
             if len(player_nick) > 10:
                 player_nick = f"{player_nick[0:9]}..."
 
-            stat += f"<b>{counter}</b> | <i>{player_nick}</i> - <b>{i[1]}</b> км\n"
+            # <> in a nick would break HTML
+            player_nick.replace("<", "\\<") \
+                       .replace(">", "\\>")
+
+            stat += f"<b>{counter}</b> | <i>{player_nick}</i> - <b>{i[1]}</b> км {medal}\n"
 
             counter += 1
 
@@ -693,7 +718,8 @@ async def attack_logic(msg: Message) -> None:
     # Obtain success chances for attacker
     chances = success_attack_chances(
         victim_id=victim_id, attacker_id=attacker_id,
-        total_value=total_size, members_count=len(victims_list)
+        victim_size=raifa_size_victim, attacker_size=raifa_size_attacker,
+        members_count=len(victims_list)
     )
 
     # Finally obtain winner id

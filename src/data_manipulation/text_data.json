@@ -65,7 +65,7 @@
                 {
                     "success_1":"_{username}_ успешно сделал пробитие _{victim}_ и отвоевал *{deltaSize} км* территории\\.\n\nТеперь _{username}_ на *{topPlaceAttacker}* месте, а _{victim}_ на *{topPlaceVictim}*",
                     "success_2":"_{username}_ отбирает *{deltaSize} км* Раифского монастыря у _{victim}_\\. \n\nЕго Раифский монастырь теперь на *{topPlaceAttacker}* месте, а у _{victim}_ на *{topPlaceVictim}*",
-                    "success_3":"_{username}_ отправил армию Яромиров на территорию _{victim}_ взорвав у него *{deltaSize}* км территории\\. \n\nЕго Раифа на *{topPlaceAttacker}*"
+                    "success_3":"_{username}_ отправил армию Яромиров на территорию _{victim}_ взорвав у него *{deltaSize}* км территории\\. \n\nЕго Раифа на *{topPlaceAttacker}* месте"
                 },
                 "ATTACK_FAILED":
                 {
