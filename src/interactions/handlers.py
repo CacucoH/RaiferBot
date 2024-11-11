@@ -9,7 +9,7 @@ from aiogram import types, F, Router
 
 from aiogram.enums import ChatType
 from aiogram.filters import (Command, PROMOTED_TRANSITION, JOIN_TRANSITION, \
-                             LEAVE_TRANSITION, chat_member_updated)
+                             LEAVE_TRANSITION, chat_member_updated, or_f)
 
 from src.interactions import logic, my_filters
 from main import bot
@@ -181,7 +181,18 @@ async def attack(msg: Message):
     if not muted:
         await logic.attack_logic(msg=msg)
 
-@group_router.message()
+
+@group_router.message(
+    or_f
+    (
+        F.text.regexp(r'((и[а-я]и)|(п*[а-я]*ш[а-я]*л)).*н[а-я]+', mode="search", flags=2),
+        F.text.regexp(r'н[а-я](х|з)+.*((и[а-я]и)|(п*[а-я]*ш[а-я]*л))', mode="search", flags=2)
+    )
+)
 async def idi_naxyu(msg: Message):
-    if msg.text.lower() == "иди нахуй":
-        msg.answer("Сам иди")
+    await msg.answer("Сам иди")
+
+
+@group_router.message(F.text.regexp(r'с+[а-я]+с+[а-я]+', mode="search", flags=2))
+async def sosi(msg: Message):
+    await msg.answer("Сам этим занимайся")

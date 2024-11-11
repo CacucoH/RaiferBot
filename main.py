@@ -46,7 +46,7 @@ async def main():
                            
 
 if __name__ == "__main__":
-    today = datetime.now().strftime("%Y-%m-%d_%H-%M")
+    today = datetime.now().strftime("%Y-%m-%d_%H:%M")
 
     # Write logs
     logging.basicConfig(
