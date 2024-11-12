@@ -419,12 +419,16 @@ def pick_a_victim(victims: list[int]) -> int:
         victims_pool = victims
 
     # Observe difference between raifa sizes
-    total_difference = 0
+    total_difference = 1
     if victims_pool_counter != 1:
         for i in range(0, victims_pool_counter-1):
             total_difference += abs(victims_pool[i] - victims_pool[i+1])
     else:
         total_difference = victims_pool[0]
+
+    # Avoid zero division
+    if total_difference == 0:
+        total_difference = 1
     
     # Define occurance frequency for each user
     # That is based on difference between raifa sizes
