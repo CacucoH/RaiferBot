@@ -6,6 +6,8 @@
 """
 from aiogram.types import Message, CallbackQuery
 from aiogram import types, F, Router
+from aiogram.fsm.context import FSMContext
+
 
 from aiogram.enums import ChatType
 from aiogram.filters import (Command, PROMOTED_TRANSITION, JOIN_TRANSITION, \
@@ -13,6 +15,7 @@ from aiogram.filters import (Command, PROMOTED_TRANSITION, JOIN_TRANSITION, \
 
 from src.interactions import logic, my_filters
 from main import bot
+from src.misc.states import States
 
 
 # Handles only group messages
@@ -52,15 +55,39 @@ async def start_handler(msg: Message) -> None:
     await logic.start_handler_logic(msg=msg)
 
 
-@private_router.message(F.content_type.in_({'text', 'sticker'}))
+@private_router.message(F.content_type.in_({'text', 'sticker'}), States.mainState)
 async def message_reply(msg: Message) -> None:
     prem = {None:"без премки", True:"крутой"}
     await msg.answer(f"Ты знал что ты {msg.from_user.first_name} и еще ты {prem[msg.from_user.is_premium]}")
+    # await dummytask(msg)
+
+
+@private_router.message(States.inputState)
+async def get_message_text(msg: Message, state: FSMContext):
+    # await confirm_action(None, state, msg)
+    await logic.message_sent_from_bots_name_logic(msg)
+    await state.set_state(States.mainState)
+
+
+# async def dummytask(m: Message):
+#     await m.answer("хуй прерван")
+
+
+# async def longtask():
+#     await asyncio.sleep(100)
+#     print("закончил пинать хуй")
 
 
 """
     DM BUTTON HANDLERS
 """
+@private_router.callback_query(States.confirmationState)
+async def confirm_action(call: CallbackQuery, state: FSMContext, msg: Message | None = None):
+    if not msg:
+        await logic.action_confirmation(call=call)
+        return
+    
+    await logic.action_confirmation(msg=msg)
 
 
 @private_router.callback_query(F.data == "rules")
@@ -74,18 +101,27 @@ async def setup_menu(call: CallbackQuery):
 
 
 @private_router.callback_query(F.data == "exit_main_menu")
-async def send_menu(call: CallbackQuery):
+async def send_menu(call: CallbackQuery, state: FSMContext):
+    await state.set_state(States.mainState)
     await logic.start_handler_logic(callback=call)
 
 
 @private_router.callback_query(F.data.regexp(r"setup_channel:-*[0-9]+"))
 async def setup_chat(call: CallbackQuery):
-    await logic.setup_chat_logic(callback=call)
+    await logic.setup_chat_logic(call)
 
 
 @private_router.callback_query(F.data.regexp(r"delete_bot_in:-*[0-9]+"))
-async def remove_bot_from(call: CallbackQuery):
-    await logic.remove_bot_from_logic(callback=call)
+async def remove_bot_from(call: CallbackQuery, state: FSMContext):
+    await logic.remove_bot_from_logic(call)
+    # await state.set_state(States.confirmationState)
+
+
+@private_router.callback_query(F.data.regexp(r"send_msg_to:-*[0-9]+"))
+async def send_message_from_bots_name(call: CallbackQuery, state: FSMContext):
+    await state.set_state(States.inputState)
+    await logic.send_message_from_bots_name_logic(call)
+
 
 
 """
@@ -193,6 +229,6 @@ async def idi_naxyu(msg: Message):
     await msg.answer("Сам иди")
 
 
-@group_router.message(F.text.regexp(r'с+[а-я]+с+[а-я]+', mode="search", flags=2))
+@group_router.message(F.text.regexp(r'(с|c)+[аояoр]+(с|c)+[иоур]+', mode="search", flags=2))
 async def sosi(msg: Message):
     await msg.answer("Сам этим занимайся")

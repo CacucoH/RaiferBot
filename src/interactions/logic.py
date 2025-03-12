@@ -1,14 +1,17 @@
 """
     All logic for events are written here
 """
+import json, logging
 from aiogram.types import (Message, InlineKeyboardButton, InlineKeyboardMarkup,
                            ChatMemberAdministrator, CallbackQuery)
 from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
-from aiogram.enums import ChatType, ChatMemberStatus
 from aiogram.filters import chat_member_updated
 from datetime import datetime, timedelta
 from random import randint, choice
-import json, logging
+
+# I'm not sure yet to leave FSM in this code or to remove it
+# # Maybe I'll use it in the future 
+from aiogram.fsm.context import FSMContext
 
 from src.data_manipulation import database
 from main import bot
@@ -17,6 +20,13 @@ from main import bot
 # Obtain all neccessary json data
 with open("./src/data_manipulation/text_data.json", "r") as f:
     json_data = json.load(f)
+
+# Needed for sending messages to channel from bot's name
+# Stores USER_ID and CHANNEL_Id pair
+message_id_dictionary = {}
+
+# Stores a message that should be deleted for this user
+msg_to_delete = {}
 
 
 # ███████╗██╗   ██╗███████╗████████╗███████╗███╗   ███╗    ██╗  ██╗ █████╗ ███╗   ██╗██████╗ ██╗     ███████╗██████╗ ███████╗
@@ -27,8 +37,43 @@ with open("./src/data_manipulation/text_data.json", "r") as f:
 # ╚══════╝   ╚═╝   ╚══════╝   ╚═╝   ╚══════╝╚═╝     ╚═╝    ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝
 
 
-def get_start_message(user_id: int, chat_id: int) -> str:
-    # Check if this is first user's occurance
+def filterMessages(message: str):
+    """Filter message from illegal symbols"""
+    illegal_symbols = "'\\./,][!@#$%^&()+{}\"|>?<"
+    special_symbols = "*_~"
+
+    # Filter symbols
+    for symbol in illegal_symbols:
+        message = message.replace(symbol, "\\" + symbol)
+    
+    # Handle special symbols
+    for symbol in special_symbols:
+        message = message.replace(symbol, symbol*2)
+        
+    # print(message)
+    return message
+
+
+async def delete_expired_messages(msg_id: int, chat_id: int):
+    """Deletes expired messages to keep chat clear"""
+    await bot.delete_message(chat_id=chat_id, message_id=msg_id)
+
+
+def make_keyboard(*args):
+    """A function that makes a keyboard from provided arguments"""
+    options = []
+    for i in args:
+        options.append(
+            [
+                InlineKeyboardButton(text=i[0], callback_data=i[1])
+            ]
+        )
+
+    return InlineKeyboardMarkup(inline_keyboard=options)
+
+
+def get_start_message(user_id: int) -> str:
+    """Check if this is first user's occurance"""
     user_in_db = database.check_user_exist_v2(id=user_id)
 
     if not user_in_db:
@@ -37,7 +82,7 @@ def get_start_message(user_id: int, chat_id: int) -> str:
 
 
 async def show_rules_dm(callback: CallbackQuery):
-    reply_markup = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=json_data['RU']['DM_MENU']['BUTTONS']['RETURN_MENU'], callback_data="exit_main_menu")]])
+    reply_markup = make_keyboard((json_data['RU']['DM_MENU']['BUTTONS']['RETURN_MENU'], "exit_main_menu"))
     await callback.message.edit_text(
         text=json_data['RU']['RULES']['rules_DM'],
         reply_markup=reply_markup
@@ -46,7 +91,8 @@ async def show_rules_dm(callback: CallbackQuery):
 
 async def start_handler_logic(
     msg: Message | None = None,
-    callback: CallbackQuery | None = None
+    callback: CallbackQuery | None = None,
+    custom_text: str | None = None
 ):
     # Create a keyboard of needed buttons
     keyboard = (
@@ -69,7 +115,6 @@ async def start_handler_logic(
     if callback:
         text_message = get_start_message(
             user_id=callback.from_user.id,
-            chat_id=callback.from_user.id
         )
         await callback.message.edit_text(
             text=text_message,
@@ -81,8 +126,12 @@ async def start_handler_logic(
     if not msg:
         return
     
-    # Send new greets message to the user
-    text_message = get_start_message(user_id=msg.from_user.id, chat_id=msg.from_user.id)
+    # Send new greets message to the user    
+    if not custom_text:
+        text_message = get_start_message(user_id=msg.from_user.id)
+    else:
+        text_message = custom_text
+
     await bot.send_message(chat_id=msg.from_user.id, text=text_message, reply_markup=reply_markup)
 
 
@@ -127,8 +176,18 @@ async def setup_menu_logic(callback: CallbackQuery):
 
 async def setup_chat_logic(callback: CallbackQuery):
     this_chat_id = callback.data.split(":")[1]
+    actions = make_keyboard(
+        (json_data['RU']['DM_MENU']['BUTTONS']['MENU_OPTIONS']['send_message'], f"send_msg_to:{this_chat_id}"),
+        (json_data['RU']['DM_MENU']['BUTTONS']['MENU_OPTIONS']['kick'], f"delete_bot_in:{this_chat_id}"),
+        (json_data['RU']['DM_MENU']['BUTTONS']['RETURN_MENU'], "exit_main_menu")
+    )
+
     actions_on_channel = (
         [
+            [
+                InlineKeyboardButton(text=json_data['RU']['DM_MENU']['BUTTONS']['MENU_OPTIONS']['send_message'],
+                                     callback_data=f"send_msg_to:{this_chat_id}")
+            ],
             [
                 InlineKeyboardButton(text=json_data['RU']['DM_MENU']['BUTTONS']['MENU_OPTIONS']['kick'],
                                      callback_data=f"delete_bot_in:{this_chat_id}")
@@ -140,11 +199,40 @@ async def setup_chat_logic(callback: CallbackQuery):
         ]
     )
 
-    reply_markup = InlineKeyboardMarkup(inline_keyboard=actions_on_channel)
+    # reply_markup = InlineKeyboardMarkup(inline_keyboard=actions_on_channel)
+    reply_markup = actions
     await callback.message.edit_text(
         text="Выбери действие:",
         reply_markup=reply_markup
     )
+
+
+async def send_message_from_bots_name_logic(callback: CallbackQuery):
+    """Receives channel id from user and asks for text to send"""
+    reply_markup = make_keyboard((json_data['RU']['DM_MENU']['BUTTONS']['RETURN_MENU'], "exit_main_menu"))
+    data = callback.data.split(":")
+
+    # Record id of the message that should be deleted in future
+    msg_to_delete[callback.from_user.id] = callback.message.message_id
+    
+    # Define where to send the message
+    chat_id = data[1]
+
+    # Set user_id message_id pair
+    message_id_dictionary[callback.from_user.id] = chat_id
+    await callback.message.edit_text(text=json_data['RU']['DM_MENU']['SEND_MSG']["send_msg_dm"], reply_markup=reply_markup)
+
+
+async def message_sent_from_bots_name_logic(msg: Message):
+    chat_id = message_id_dictionary[msg.from_user.id]
+    user_id = msg.from_user.id
+
+    message = filterMessages(msg.text)
+
+    await bot.send_message(chat_id=chat_id, text=message)
+    # await delete_expired_messages(msg_to_delete[user_id], user_id)
+    await start_handler_logic(msg=msg, custom_text=json_data['RU']['DM_MENU']['SEND_MSG'][f"msg_sent_{randint(1,4)}"])
+
 
 
 async def remove_bot_from_logic(callback: CallbackQuery):
@@ -333,6 +421,25 @@ def clean_mute_warnings(player_id: int, chat_id: int):
     database.unmute_player(player_id, chat_id)
 
 
+async def action_confirmation(call: CallbackQuery | None = None, msg: Message | None = None):
+    if msg:
+        data = msg.text
+        actions = make_keyboard(
+        (json_data['RU']['DM_MENU']['ASSURANCE']['yes'], data),
+        (json_data['RU']['DM_MENU']['ASSURANCE']['no'], "exit_main_menu")
+        )
+        await msg.answer(text=json_data['RU']['DM_MENU']['ASSURANCE']['sure_1'], reply_markup=actions)
+        return
+    
+    actions = make_keyboard(
+        (json_data['RU']['DM_MENU']['ASSURANCE']['yes'], data),
+        (json_data['RU']['DM_MENU']['ASSURANCE']['no'], "exit_main_menu")
+    )
+    
+    data = call.data
+    await call.message.edit_text(text=json_data['RU']['DM_MENU']['ASSURANCE']['sure_1'], reply_markup=actions)
+
+
 
 #  ██████╗  █████╗ ███╗   ███╗███████╗    ██╗  ██╗ █████╗ ███╗   ██╗██████╗ ██╗     ███████╗██████╗ ███████╗
 # ██╔════╝ ██╔══██╗████╗ ████║██╔════╝    ██║  ██║██╔══██╗████╗  ██║██╔══██╗██║     ██╔════╝██╔══██╗██╔════╝
@@ -468,13 +575,15 @@ def success_attack_chances(
         delta = 1
 
     # Find the dominance of victim (difference in sizes / size of attacker); can be 0 < and < 1 or >= 1
-    size_coeff = attacker_size / delta
+    size_coeff = int(attacker_size / delta)
 
     if attacker_size < victim_size:
         size_coeff = size_coeff - (victim_size / attacker_size)
 
-        if size_coeff < 0:
-            size_coeff = 1
+        if size_coeff <= 0:
+            # Small fora for people with less size
+            if attacker_size < victim_size / 3:
+                size_coeff = int(victim_size / attacker_size)
 
     # Compute chances
     victim_chances = victim_luck
@@ -504,7 +613,7 @@ def get_delta_size(victim_current_size: int) -> int:
 async def grow_raifa_logic(msg: Message) -> None:
     """
         ### Basically the main purpose of this bot
-        Grows/decreases user's raifa
+        Grows/decreases user's raifa size
     """
     user_id = msg.from_user.id
     chat_id = msg.chat.id

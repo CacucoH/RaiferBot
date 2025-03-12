@@ -10,6 +10,8 @@ from aiogram import Dispatcher, Bot
 from dotenv import load_dotenv
 from datetime import datetime
 
+from src.misc import clock
+
 
 # Create an Disptcher instance and load env data
 dp = Dispatcher(storage=MemoryStorage())
@@ -39,11 +41,13 @@ async def main():
     dp.include_router(router=group_router)
     dp.include_router(router=private_router)
 
+    # await clock.initialize_clock(asyncio.get_event_loop())
+
     await bot.delete_webhook(drop_pending_updates=True)
     updates = dp.resolve_used_update_types()
     updates.append("chat_member")
     await dp.start_polling(bot, allowed_updates=updates)
-                           
+
 
 if __name__ == "__main__":
     today = datetime.now().strftime("%Y-%m-%d_%H:%M")
