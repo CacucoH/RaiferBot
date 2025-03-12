@@ -71,7 +71,7 @@ def check_user_exist(id: int, chat_id: int) -> bool:
 
 
 def check_user_exist_v2(id: int) -> bool:
-    """CHECK IF USER EXIST IN DB"""
+    """CHECK IF USER EXIST IN DB"""#
     user = c.execute("SELECT user_id FROM usr_chan_connection WHERE user_id=?",
                      (id,)).fetchall()
     
