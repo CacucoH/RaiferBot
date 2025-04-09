@@ -185,14 +185,14 @@ async def attack(msg: Message):
 @group_router.message(
     or_f
     (
-        F.text.regexp(r'((и[а-я]и)|(п*[а-я]*ш[а-я]*л)).*н[а-я]+', mode="search", flags=2),
-        F.text.regexp(r'н[а-я](х|з)+.*((и[а-я]и)|(п*[а-я]*ш[а-я]*л))', mode="search", flags=2)
+        F.text.regexp(r'((и[а-я]и)|(п[а-я]{0,1}ш[а-я]{0,1}л)).*н[а-я](x|х){0,1}', mode="search", flags=2),
+        F.text.regexp(r'н[а-я](х|з)+(y|у){0,1}.*((и[а-я]и)|(п[а-я]{0,1}ш[а-я]{0,1}л))', mode="search", flags=2)
     )
 )
 async def idi_naxyu(msg: Message):
     await msg.answer("Сам иди")
 
 
-@group_router.message(F.text.regexp(r'с+[а-я]+с+[а-я]+', mode="search", flags=2))
+@group_router.message(F.text.regexp(r'с{1,3}[а-я]с{1,3}[а-я]', mode="search", flags=2))
 async def sosi(msg: Message):
     await msg.answer("Сам этим занимайся")
